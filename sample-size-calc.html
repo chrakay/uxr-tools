@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survey Sample Size Calculator</title>
+</head>
+<body>
+    <h1>Survey Sample Size Calculator</h1>
+    
+    <div>
+        <label>Level of Evidence Needed:</label>
+        <select id="evidenceLevel" onchange="recalculateAllQuestions()">
+            <option value="0.05">Decision-making (1 in 20 chance of error)</option>
+            <option value="0.10">Scrappy exploration (1 in 10 chance of error)</option>
+            <option value="0.01">Gold standard (1 in 100 chance of error)</option>
+        </select>
+    </div>
+
+    <div>
+        <h2>Your Survey Questions</h2>
+        <button onclick="addQuestion()">Add Question</button>
+        <table border="1" cellpadding="10">
+            <thead>
+                <tr>
+                    <th>Question</th>
+                    <th>Type</th>
+                    <th>Parameters</th>
+                    <th>Sample Size</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="questionsTableBody">
+            </tbody>
+        </table>
+    </div>
+
+    <div>
+        <h3>Sample Size Needed for Your Survey: <span id="maxSampleSize">0</span></h3>
+        <p>Total Questions: <span id="totalQuestions">0</span></p>
+    </div>
+    <div>
+        <h2>Parameter guide</h2>
+        <h3>Evidence level</h3>
+        <p><b>Decision-making</b>: Standard definition of "statistical significance" with 1 in 20 odds of falsely producing the opposite result (e.g. survey results say A is higher when in reality B is higher) due to statistical error. Good for most general decisions, use this if unsure.
+        <p><b>Scrappy exploration</b>: Good for cases like initial exploration and legitimate need to move faster on less evidence where trading a lower sample size for 1 in 10 odds of an incorrect result (α = 0.10) is preferable.</p>
+        <p><b>Gold standard</b>: For high-stakes decisions where you really cannot afford to be wrong. Trade a larger sample size for dropping odds of being wrong to 1 in 100 (α = 0.01).</p>
+        <h3>Desired MOE (Margin of Error)</h3>
+        <p>Desured level of accuracy in the results. This is reported widely for political polls, if a poll shows one candidate is polling at 45% with a margin of error of 1%, the actual value for the candidate is between 44% and 46%. In this calculator the units are in percent for binary, check all, and multiple choice questions. Likert is in scale points (e.g. +/- 0.5 points), and numeric is in whatever units are in the free response (e.g. +/- 5 years for 'Enter your age in years').</p>
+        <h3>Question Type</h3>
+        <p><b>Binary</b>: Two mutually exclusive options, e.g. yes/no or true/false.</p>
+        <p><b>Check All</b>: Check-all-that-apply quesions where participants can check more than one answer. Produces the same result as binary questions because the checkboxes are treated as separate true/false events.</p>
+        <p><b>Multiple choice:</b> 3+ mutually exlusive options that have no particular ranking. The number of response options changes the calculations, but it's best to use the exact number of response options that is best to answer your question; adding excessive options just to bring down the sample size will cause other problems.</p>
+        <p><b>Likert</b>: For Likert scales or other questions where responses are ranked with "equal" distance between each (e.g. "Strongly agree", "Somewhat agree", "Somewhat disagree", "Strongly disagree").</p>
+        <p><b>Numeric</b>: For numbers entered as free text, such as age. For range, estimate the range where you expect 95% of responses to fall into, e.g. for working professionals it might be ages 18-65. If you aren't sure, err on the side of a wider range.</p>
+    </div>
+
+    <script>
+    let questionCounter = 0;
+    let questions = [];
+
+    function getZScore() {
+        const alpha = parseFloat(document.getElementById('evidenceLevel').value);
+        if (alpha === 0.01) return 2.576;
+        if (alpha === 0.10) return 1.645;
+        return 1.96;
+    }
+
+    function addQuestion() {
+        const id = questionCounter++;
+        const question = {
+            id: id,
+            text: '',
+            type: 'binary',
+            params: { moe: 0 },
+            sampleSize: 0
+        };
+        questions.push(question);
+        renderQuestions();
+        updateMaxSampleSize();
+    }
+
+    function removeQuestion(id) {
+        questions = questions.filter(q => q.id !== id);
+        renderQuestions();
+        updateMaxSampleSize();
+    }
+
+    function updateQuestion(id, field, value) {
+        const question = questions.find(q => q.id === id);
+        if (!question) return;
+        
+        if (field === 'text') {
+            question.text = value;
+        } else if (field === 'type') {
+            question.type = value;
+            if (value === 'binary' || value === 'checkall') {
+                question.params = { moe: 0 };
+            } else if (value === 'multiple') {
+                question.params = { moe: 0 , options: 0 };
+            } else if (value === 'likert') {
+                question.params = { moe: 0 , points: 0 };
+            } else if (value === 'numeric') {
+                question.params = { moe: 0, lower: 0, upper: 0 };
+            }
+            renderQuestions();
+        } else {
+            question.params[field] = parseFloat(value);
+        }
+        
+        calculateQuestionSampleSize(question);
+        renderQuestionRow(question);
+        updateMaxSampleSize();
+    }
+
+    function calculateQuestionSampleSize(question) {
+        const z = getZScore();
+        let n = 0;
+        
+        if (question.type === 'binary' || question.type === 'checkall') {
+            if (question.params.moe <= 0) {
+                question.sampleSize = 0;
+                return;
+            }
+            const moe = question.params.moe / 100;
+            const p = 0.5;
+            n = Math.ceil((z * z * p * (1 - p)) / (moe * moe));
+        } else if (question.type === 'multiple') {
+            if (question.params.moe <= 0 || question.params.options <= 0) {
+                question.sampleSize = 0;
+                return;
+            }
+            const moe = question.params.moe / 100;
+            const k = question.params.options;
+            const p = 1 / k;
+            n = Math.ceil((z * z * p * (1 - p)) / (moe * moe));
+        } else if (question.type === 'likert') {
+            if (question.params.moe <= 0 || question.params.points <= 0) {
+                question.sampleSize = 0;
+                return;
+            }
+            const moe = question.params.moe;
+            const points = question.params.points;
+            const sd = (points - 1) / 4;
+            n = Math.ceil((z * z * sd * sd) / (moe * moe));
+        } else if (question.type === 'numeric') {
+            if (question.params.moe <= 0 || question.params.upper <= question.params.lower) {
+                question.sampleSize = 0;
+                return;
+            }
+            const moe = question.params.moe;
+            const lower = question.params.lower;
+            const upper = question.params.upper;
+            const sd = (upper - lower) / 4;
+            n = Math.ceil((z * z * sd * sd) / (moe * moe));
+        }
+        
+        question.sampleSize = n;
+    }
+
+    function renderQuestions() {
+        const tbody = document.getElementById('questionsTableBody');
+        tbody.innerHTML = '';
+        
+        if (questions.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5">No questions yet. Click "Add Question" to get started.</td></tr>';
+            return;
+        }
+        
+        questions.forEach(q => {
+            renderQuestionRow(q);
+        });
+    }
+
+    function renderQuestionRow(question) {
+        const tbody = document.getElementById('questionsTableBody');
+        let existingRow = document.getElementById(`question-row-${question.id}`);
+        
+        const typeNames = {
+            'binary': 'Binary (Yes/No)',
+            'checkall': 'Check All',
+            'multiple': 'Multiple Choice',
+            'likert': 'Likert Scale',
+            'numeric': 'Numeric'
+        };
+        
+        let paramsHtml = '';
+        if (question.type === 'binary' || question.type === 'checkall') {
+            paramsHtml = `
+                Desired MOE: <input type="number" value="${question.params.moe}" min="0.1" step="0.1" 
+                    onchange="updateQuestion(${question.id}, 'moe', this.value)"> %
+            `;
+        } else if (question.type === 'multiple') {
+            paramsHtml = `
+                Desired MOE: <input type="number" value="${question.params.moe}" min="0.1" step="0.1"
+                    onchange="updateQuestion(${question.id}, 'moe', this.value)"> % |
+                Options: <input type="number" value="${question.params.options}" min="2" step="1"
+                    onchange="updateQuestion(${question.id}, 'options', this.value)">
+            `;
+        } else if (question.type === 'likert') {
+            paramsHtml = `
+                Desired MOE: <input type="number" value="${question.params.moe}" min="0.01" step="0.01"
+                    onchange="updateQuestion(${question.id}, 'moe', this.value)"> pts |
+                Points: <input type="number" value="${question.params.points}" min="2" step="1"
+                    onchange="updateQuestion(${question.id}, 'points', this.value)">
+            `;
+        } else if (question.type === 'numeric') {
+            paramsHtml = `
+                Desired MOE: <input type="number" value="${question.params.moe}" min="0.01" step="0.1"
+                    onchange="updateQuestion(${question.id}, 'moe', this.value)"> |
+                Expected Range: <input type="number" value="${question.params.lower}" step="1"
+                    onchange="updateQuestion(${question.id}, 'lower', this.value)"> -
+                <input type="number" value="${question.params.upper}" step="1"
+                    onchange="updateQuestion(${question.id}, 'upper', this.value)">
+            `;
+        }
+        
+        const rowHtml = `
+            <tr id="question-row-${question.id}">
+                <td>
+                    <input type="text" value="${question.text}" placeholder="Enter your question..."
+                        onchange="updateQuestion(${question.id}, 'text', this.value)">
+                </td>
+                <td>
+                    <select onchange="updateQuestion(${question.id}, 'type', this.value)">
+                        <option value="binary" ${question.type === 'binary' ? 'selected' : ''}>Binary</option>
+                        <option value="checkall" ${question.type === 'checkall' ? 'selected' : ''}>Check All</option>
+                        <option value="multiple" ${question.type === 'multiple' ? 'selected' : ''}>Multiple Choice</option>
+                        <option value="likert" ${question.type === 'likert' ? 'selected' : ''}>Likert</option>
+                        <option value="numeric" ${question.type === 'numeric' ? 'selected' : ''}>Numeric</option>
+                    </select>
+                </td>
+                <td>${paramsHtml}</td>
+                <td>${question.sampleSize}</td>
+                <td>
+                    <button onclick="removeQuestion(${question.id})">Remove</button>
+                </td>
+            </tr>
+        `;
+        
+        if (existingRow) {
+            existingRow.outerHTML = rowHtml;
+        } else {
+            tbody.insertAdjacentHTML('beforeend', rowHtml);
+        }
+    }
+
+    function updateMaxSampleSize() {
+        const maxSize = questions.length > 0 ? Math.max(...questions.map(q => q.sampleSize)) : 0;
+        document.getElementById('maxSampleSize').textContent = maxSize;
+        document.getElementById('totalQuestions').textContent = questions.length;
+    }
+
+    function recalculateAllQuestions() {
+        questions.forEach(q => calculateQuestionSampleSize(q));
+        renderQuestions();
+        updateMaxSampleSize();
+    }
+
+    window.addEventListener('DOMContentLoaded', function() {
+        renderQuestions();
+        updateMaxSampleSize();
+    });
+    </script>
+</body>
+</html>
