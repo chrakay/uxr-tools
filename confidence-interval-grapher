@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survey Results with Confidence Intervals</title>
+    <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist@2.27.0/plotly.min.js"></script>
+    <style>
+        #results {
+            display: none;
+        }
+        #plot {
+            width: 100%;
+            height: 500px;
+        }
+    </style>
+</head>
+<body>
+    <div class="input-section">
+        <h2>Survey Data Input</h2>
+        
+        <label>Question Name:</label>
+        <input type="text" id="question" placeholder="e.g., How satisfied are you with our service?">
+        
+        <label>Total N (total number of respondents):</label>
+        <input type="number" id="totalN" placeholder="e.g., 200" min="1">
+        
+        <label>Response Options and Counts:</label>
+        <table id="responses-container">
+            <tr class="response-row">
+                <td><input type="text" placeholder="Response option 1" class="response-option" size="40"></td>
+                <td><input type="number" placeholder="Count" min="0" class="response-count" size="10"></td>
+            </tr>
+            <tr class="response-row">
+                <td><input type="text" placeholder="Response option 2" class="response-option" size="40"></td>
+                <td><input type="number" placeholder="Count" min="0" class="response-count" size="10"></td>
+            </tr>
+        </table>
+        
+        <button id="add-response">+ Add Response Option</button>
+        
+        <label>Confidence Level:</label>
+        <select id="confidence">
+            <option value="90">90%</option>
+            <option value="95" selected>95%</option>
+            <option value="99">99%</option>
+        </select>
+        
+        <button id="generate">Generate Chart</button>
+    </div>
+
+    <div id="results">
+        <h1 id="question-title"></h1>
+        <div id="sample-size"></div>
+        <div id="plot"></div>
+        <h3>Detailed Results</h3>
+        <table id="results-table">
+                <thead>
+                    <tr>
+                        <th>Response Option</th>
+                        <th>Count</th>
+                        <th>Percentage</th>
+                        <th>Margin of Error</th>
+                        <th>Lower Bound</th>
+                        <th>Upper Bound</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let responseCount = 2;
+
+        function addResponseField() {
+            responseCount++;
+            const container = document.getElementById('responses-container');
+            const tr = document.createElement('tr');
+            tr.className = 'response-row';
+            tr.innerHTML = `
+                <td><input type="text" placeholder="Response option ${responseCount}" class="response-option" size="40"></td>
+                <td><input type="number" placeholder="Count" min="0" class="response-count" size="10"></td>
+            `;
+            container.appendChild(tr);
+        }
+
+        function calculateCI(count, total, confidenceLevel) {
+            const p = count / total;
+            const se = Math.sqrt((p * (1 - p)) / total);
+            
+            // Z-scores for different confidence levels
+            const zScores = {
+                90: 1.645,
+                95: 1.96,
+                99: 2.576
+            };
+            const z = zScores[confidenceLevel];
+            
+            return {
+                proportion: p,
+                lower: Math.max(0, p - z * se),
+                upper: Math.min(1, p + z * se)
+            };
+        }
+
+        function generateChart() {
+            const question = document.getElementById('question').value;
+            const totalN = parseInt(document.getElementById('totalN').value);
+            const confidenceLevel = parseInt(document.getElementById('confidence').value);
+            
+            const options = document.querySelectorAll('.response-option');
+            const counts = document.querySelectorAll('.response-count');
+            
+            const responses = [];
+            for (let i = 0; i < options.length; i++) {
+                const option = options[i].value.trim();
+                const count = parseInt(counts[i].value);
+                if (option && !isNaN(count)) {
+                    responses.push({ option, count });
+                }
+            }
+
+            if (!question || !totalN || responses.length === 0) {
+                alert('Please fill in the question name, total N, and at least one response option.');
+                return;
+            }
+
+            // Prepare data for plotting
+            const yValues = [];
+            const xValues = [];
+            const errorMinus = [];
+            const errorPlus = [];
+            const text = [];
+
+            responses.forEach(r => {
+                const ci = calculateCI(r.count, totalN, confidenceLevel);
+                const percentage = ci.proportion * 100;
+                const lowerBound = ci.lower * 100;
+                const upperBound = ci.upper * 100;
+                
+                yValues.push(r.option);
+                xValues.push(percentage);
+                errorMinus.push(percentage - lowerBound);
+                errorPlus.push(upperBound - percentage);
+                text.push(`${r.count} (${percentage.toFixed(1)}%)`);
+            });
+
+            const trace = {
+                type: 'bar',
+                x: xValues,
+                y: yValues,
+                orientation: 'h',
+                marker: {
+                    color: '#4a90e2'
+                },
+                error_x: {
+                    type: 'data',
+                    symmetric: false,
+                    array: errorPlus,
+                    arrayminus: errorMinus,
+                    color: '#000',
+                    thickness: 2,
+                    width: 6
+                }
+            };
+
+            const layout = {
+                xaxis: {
+                    title: 'Percentage (%)',
+                    range: [0, Math.max(...xValues.map((x, i) => x + errorPlus[i])) * 1.1]
+                },
+                yaxis: {
+                    title: ''
+                },
+                margin: {
+                    l: 150,
+                    r: 50,
+                    t: 20,
+                    b: 50
+                },
+                font: {
+                    family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                }
+            };
+
+            Plotly.newPlot('plot', [trace], layout, {responsive: true});
+            
+            // Populate table
+            const tableBody = document.getElementById('table-body');
+            tableBody.innerHTML = '';
+            
+            responses.forEach((r, i) => {
+                const ci = calculateCI(r.count, totalN, confidenceLevel);
+                const percentage = ci.proportion * 100;
+                const lowerBound = ci.lower * 100;
+                const upperBound = ci.upper * 100;
+                const marginOfError = Math.max(percentage - lowerBound, upperBound - percentage);
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${r.option}</td>
+                    <td>${r.count}</td>
+                    <td>${percentage.toFixed(2)}%</td>
+                    <td>±${marginOfError.toFixed(2)}%</td>
+                    <td>${lowerBound.toFixed(2)}%</td>
+                    <td>${upperBound.toFixed(2)}%</td>
+                `;
+                tableBody.appendChild(row);
+            });
+            
+            document.getElementById('question-title').textContent = question;
+            document.getElementById('sample-size').textContent = `Total responses: ${totalN}`;
+            document.getElementById('results').style.display = 'block';
+        }
+
+        document.getElementById('add-response').addEventListener('click', addResponseField);
+        document.getElementById('generate').addEventListener('click', generateChart);
+    </script>
+</body>
+</html>
