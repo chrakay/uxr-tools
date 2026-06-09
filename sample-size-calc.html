@@ -4,12 +4,58 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Survey Sample Size Calculator</title>
+    <style>
+        .tip {
+            position: relative;
+            display: inline-block;
+        }
+        .tip-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #888;
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+            cursor: help;
+            border: none;
+            margin-left: 4px;
+            vertical-align: middle;
+            line-height: 1;
+        }
+        .tip-text {
+            display: none;
+            position: absolute;
+            background: #222;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-size: 13px;
+            line-height: 1.5;
+            z-index: 1000;
+            width: 280px;
+            left: 22px;
+            top: -6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        .tip:hover .tip-text {
+            display: block;
+        }
+    </style>
 </head>
 <body>
     <h1>Survey Sample Size Calculator</h1>
-    
+
     <div>
-        <label>Level of Evidence Needed:</label>
+        <label>Level of Evidence Needed:
+            <span class="tip">
+                <span class="tip-btn">?</span>
+                <span class="tip-text">How confident do you need to be in your results?<br><br>Use <strong>Decision-making</strong> for most surveys. Choose <strong>Scrappy exploration</strong> when in early discovery and some noise is acceptable. Reserve <strong>Gold standard</strong> for high-stakes decisions where being wrong has real consequences.</span>
+            </span>
+        </label>
         <select id="evidenceLevel" onchange="recalculateAllQuestions()">
             <option value="0.05">Decision-making (1 in 20 chance of error)</option>
             <option value="0.10">Scrappy exploration (1 in 10 chance of error)</option>
@@ -24,7 +70,12 @@
             <thead>
                 <tr>
                     <th>Question</th>
-                    <th>Type</th>
+                    <th>Type
+                        <span class="tip">
+                            <span class="tip-btn">?</span>
+                            <span class="tip-text"><strong>Yes/No:</strong> Two options (yes/no, true/false).<br><strong>Check All:</strong> Checkboxes where participants pick multiple — each treated independently.<br><strong>Multiple Choice:</strong> Pick one from 3+ options.<br><strong>Likert / Rating Scale:</strong> Ordered scale with equal steps (e.g. 1–5 agreement).<br><strong>Numeric:</strong> A number entered as free text (e.g. age, price).</span>
+                        </span>
+                    </th>
                     <th>Parameters</th>
                     <th>Sample Size</th>
                     <th></th>
@@ -39,25 +90,16 @@
         <h3>Sample Size Needed for Your Survey: <span id="maxSampleSize">0</span></h3>
         <p>Total Questions: <span id="totalQuestions">0</span></p>
     </div>
-    <div>
-        <h2>Parameter guide</h2>
-        <h3>Evidence level</h3>
-        <p><b>Decision-making</b>: Standard definition of "statistical significance" with 1 in 20 odds of falsely producing the opposite result (e.g. survey results say A is higher when in reality B is higher) due to statistical error. Good for most general decisions, use this if unsure.
-        <p><b>Scrappy exploration</b>: Good for cases like initial exploration and legitimate need to move faster on less evidence where trading a lower sample size for 1 in 10 odds of an incorrect result (α = 0.10) is preferable.</p>
-        <p><b>Gold standard</b>: For high-stakes decisions where you really cannot afford to be wrong. Trade a larger sample size for dropping odds of being wrong to 1 in 100 (α = 0.01).</p>
-        <h3>Desired MOE (Margin of Error)</h3>
-        <p>Desured level of accuracy in the results. This is reported widely for political polls, if a poll shows one candidate is polling at 45% with a margin of error of 1%, the actual value for the candidate is between 44% and 46%. In this calculator the units are in percent for binary, check all, and multiple choice questions. Likert is in scale points (e.g. +/- 0.5 points), and numeric is in whatever units are in the free response (e.g. +/- 5 years for 'Enter your age in years').</p>
-        <h3>Question Type</h3>
-        <p><b>Binary</b>: Two mutually exclusive options, e.g. yes/no or true/false.</p>
-        <p><b>Check All</b>: Check-all-that-apply quesions where participants can check more than one answer. Produces the same result as binary questions because the checkboxes are treated as separate true/false events.</p>
-        <p><b>Multiple choice:</b> 3+ mutually exlusive options that have no particular ranking. The number of response options changes the calculations, but it's best to use the exact number of response options that is best to answer your question; adding excessive options just to bring down the sample size will cause other problems.</p>
-        <p><b>Likert</b>: For Likert scales or other questions where responses are ranked with "equal" distance between each (e.g. "Strongly agree", "Somewhat agree", "Somewhat disagree", "Strongly disagree").</p>
-        <p><b>Numeric</b>: For numbers entered as free text, such as age. For range, estimate the range where you expect 95% of responses to fall into, e.g. for working professionals it might be ages 18-65. If you aren't sure, err on the side of a wider range.</p>
-    </div>
 
     <script>
     let questionCounter = 0;
     let questions = [];
+
+    const MOE_TIP = `<span class="tip"><span class="tip-btn">?</span><span class="tip-text">How precise the result needs to be. At ±5% MOE, if 60% say yes, the true answer falls between 55–65%. Smaller values = larger sample needed.<br><br>Units: percentage points for Yes/No, Check All, and Multiple Choice; scale points for Likert; your question's units for Numeric.</span></span>`;
+
+    const POINTS_TIP = `<span class="tip"><span class="tip-btn">?</span><span class="tip-text">Number of options on your scale. A 5-point agreement scale = 5.</span></span>`;
+
+    const RANGE_TIP = `<span class="tip"><span class="tip-btn">?</span><span class="tip-text">The low and high values covering ~95% of expected responses (e.g. ages 22–65 for working adults). When unsure, err wider — a broader range increases sample size but avoids underestimating variance.</span></span>`;
 
     function getZScore() {
         const alpha = parseFloat(document.getElementById('evidenceLevel').value);
@@ -89,7 +131,7 @@
     function updateQuestion(id, field, value) {
         const question = questions.find(q => q.id === id);
         if (!question) return;
-        
+
         if (field === 'text') {
             question.text = value;
         } else if (field === 'type') {
@@ -107,7 +149,7 @@
         } else {
             question.params[field] = parseFloat(value);
         }
-        
+
         calculateQuestionSampleSize(question);
         renderQuestionRow(question);
         updateMaxSampleSize();
@@ -116,7 +158,7 @@
     function calculateQuestionSampleSize(question) {
         const z = getZScore();
         let n = 0;
-        
+
         if (question.type === 'binary' || question.type === 'checkall') {
             if (question.params.moe <= 0) {
                 question.sampleSize = 0;
@@ -154,19 +196,19 @@
             const sd = (upper - lower) / 4;
             n = Math.ceil((z * z * sd * sd) / (moe * moe));
         }
-        
+
         question.sampleSize = n;
     }
 
     function renderQuestions() {
         const tbody = document.getElementById('questionsTableBody');
         tbody.innerHTML = '';
-        
+
         if (questions.length === 0) {
             tbody.innerHTML = '<tr><td colspan="5">No questions yet. Click "Add Question" to get started.</td></tr>';
             return;
         }
-        
+
         questions.forEach(q => {
             renderQuestionRow(q);
         });
@@ -175,46 +217,38 @@
     function renderQuestionRow(question) {
         const tbody = document.getElementById('questionsTableBody');
         let existingRow = document.getElementById(`question-row-${question.id}`);
-        
-        const typeNames = {
-            'binary': 'Binary (Yes/No)',
-            'checkall': 'Check All',
-            'multiple': 'Multiple Choice',
-            'likert': 'Likert Scale',
-            'numeric': 'Numeric'
-        };
-        
+
         let paramsHtml = '';
         if (question.type === 'binary' || question.type === 'checkall') {
             paramsHtml = `
-                Desired MOE: <input type="number" value="${question.params.moe}" min="0.1" step="0.1" 
+                Desired MOE ${MOE_TIP}: <input type="number" value="${question.params.moe}" min="0.1" step="0.1"
                     onchange="updateQuestion(${question.id}, 'moe', this.value)"> %
             `;
         } else if (question.type === 'multiple') {
             paramsHtml = `
-                Desired MOE: <input type="number" value="${question.params.moe}" min="0.1" step="0.1"
+                Desired MOE ${MOE_TIP}: <input type="number" value="${question.params.moe}" min="0.1" step="0.1"
                     onchange="updateQuestion(${question.id}, 'moe', this.value)"> % |
                 Options: <input type="number" value="${question.params.options}" min="2" step="1"
                     onchange="updateQuestion(${question.id}, 'options', this.value)">
             `;
         } else if (question.type === 'likert') {
             paramsHtml = `
-                Desired MOE: <input type="number" value="${question.params.moe}" min="0.01" step="0.01"
+                Desired MOE ${MOE_TIP}: <input type="number" value="${question.params.moe}" min="0.01" step="0.01"
                     onchange="updateQuestion(${question.id}, 'moe', this.value)"> pts |
-                Points: <input type="number" value="${question.params.points}" min="2" step="1"
+                Scale Points ${POINTS_TIP}: <input type="number" value="${question.params.points}" min="2" step="1"
                     onchange="updateQuestion(${question.id}, 'points', this.value)">
             `;
         } else if (question.type === 'numeric') {
             paramsHtml = `
-                Desired MOE: <input type="number" value="${question.params.moe}" min="0.01" step="0.1"
+                Desired MOE ${MOE_TIP}: <input type="number" value="${question.params.moe}" min="0.01" step="0.1"
                     onchange="updateQuestion(${question.id}, 'moe', this.value)"> |
-                Expected Range: <input type="number" value="${question.params.lower}" step="1"
-                    onchange="updateQuestion(${question.id}, 'lower', this.value)"> -
+                Expected Range ${RANGE_TIP}: <input type="number" value="${question.params.lower}" step="1"
+                    onchange="updateQuestion(${question.id}, 'lower', this.value)"> –
                 <input type="number" value="${question.params.upper}" step="1"
                     onchange="updateQuestion(${question.id}, 'upper', this.value)">
             `;
         }
-        
+
         const rowHtml = `
             <tr id="question-row-${question.id}">
                 <td>
@@ -223,11 +257,11 @@
                 </td>
                 <td>
                     <select onchange="updateQuestion(${question.id}, 'type', this.value)">
-                        <option value="binary" ${question.type === 'binary' ? 'selected' : ''}>Binary</option>
-                        <option value="checkall" ${question.type === 'checkall' ? 'selected' : ''}>Check All</option>
+                        <option value="binary" ${question.type === 'binary' ? 'selected' : ''}>Yes/No (Binary)</option>
+                        <option value="checkall" ${question.type === 'checkall' ? 'selected' : ''}>Check All That Apply</option>
                         <option value="multiple" ${question.type === 'multiple' ? 'selected' : ''}>Multiple Choice</option>
-                        <option value="likert" ${question.type === 'likert' ? 'selected' : ''}>Likert</option>
-                        <option value="numeric" ${question.type === 'numeric' ? 'selected' : ''}>Numeric</option>
+                        <option value="likert" ${question.type === 'likert' ? 'selected' : ''}>Likert / Rating Scale</option>
+                        <option value="numeric" ${question.type === 'numeric' ? 'selected' : ''}>Numeric (Free Text)</option>
                     </select>
                 </td>
                 <td>${paramsHtml}</td>
@@ -237,7 +271,7 @@
                 </td>
             </tr>
         `;
-        
+
         if (existingRow) {
             existingRow.outerHTML = rowHtml;
         } else {
