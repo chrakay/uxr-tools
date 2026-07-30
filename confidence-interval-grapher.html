@@ -153,6 +153,21 @@
         gap: 16px;
         margin-bottom: 4px;
     }
+    .export-controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+    }
+    .export-controls select {
+        width: auto;
+        padding: 8px 10px;
+        font-size: 13px;
+    }
+    .export-controls input[type="color"] {
+        width: 36px;
+        height: 36px;
+    }
     #sample-size { color: #666; font-size: 14px; margin-bottom: 20px; }
     #plot { width: 100%; margin-bottom: 28px; }
     #plot svg { display: block; }
@@ -181,7 +196,7 @@
         <h1>Survey Data Input</h1>
 
         <div class="field">
-            <label>Question Name</label>
+            <label>Graph Title</label>
             <input type="text" id="question" placeholder="e.g., How satisfied are you with our service?">
         </div>
 
@@ -196,8 +211,17 @@
                     <option value="90">90%</option>
                     <option value="95" selected>95%</option>
                     <option value="99">99%</option>
+                    <option value="none">None (no error bars)</option>
                 </select>
             </div>
+        </div>
+
+        <div class="field">
+            <label>Question Type</label>
+            <select id="question-type">
+                <option value="single" selected>Single choice (select one)</option>
+                <option value="multi">Check all that apply (multiple choice)</option>
+            </select>
         </div>
 
         <div class="field">
@@ -253,6 +277,16 @@
             <label for="custom-colors-toggle">Use custom colors per response option (overrides theme)</label>
         </div>
 
+        <div class="checkbox-field">
+            <input type="checkbox" id="show-labels-toggle" checked>
+            <label for="show-labels-toggle">Show value labels on bars</label>
+        </div>
+
+        <div class="checkbox-field">
+            <input type="checkbox" id="show-gridlines-toggle" checked>
+            <label for="show-gridlines-toggle">Show background gridlines</label>
+        </div>
+
         <button id="generate" class="btn-primary" type="button">Generate Chart</button>
     </div>
 
@@ -262,7 +296,15 @@
                 <h2 id="question-title"></h2>
                 <div id="sample-size"></div>
             </div>
-            <button id="export-btn" class="btn-secondary" type="button">Export PNG</button>
+            <div class="export-controls">
+                <select id="export-bg">
+                    <option value="transparent" selected>Transparent</option>
+                    <option value="white">White background</option>
+                    <option value="custom">Custom color</option>
+                </select>
+                <input type="color" id="export-bg-color" value="#ffffff" style="display:none;">
+                <button id="export-btn" class="btn-secondary" type="button">Export PNG</button>
+            </div>
         </div>
         <div id="plot"></div>
         <h3>Detailed Results</h3>
@@ -345,6 +387,9 @@
 
     function calculateCI(count, total, confidenceLevel) {
         const p = count / total;
+        if (confidenceLevel === 'none') {
+            return { proportion: p, lower: null, upper: null };
+        }
         const se = Math.sqrt((p * (1 - p)) / total);
         const zScores = { 90: 1.645, 95: 1.96, 99: 2.576 };
         const z = zScores[confidenceLevel];
@@ -355,7 +400,10 @@
         };
     }
 
-    function renderChart(data, orientation) {
+    function renderChart(data, orientation, chartOptions) {
+        const showGrid = chartOptions && chartOptions.showGrid;
+        const showLabels = chartOptions && chartOptions.showLabels;
+        const hideErrorBars = chartOptions && chartOptions.hideErrorBars;
         const container = d3.select('#plot');
         container.selectAll('*').remove();
         const containerWidth = container.node().clientWidth || 800;
@@ -380,9 +428,11 @@
             const x = d3.scaleBand().domain(data.map(d => d.option)).range([0, innerWidth]).padding(0.35);
             const y = d3.scaleLinear().domain([0, 100]).range([innerHeight, 0]);
 
-            g.append('g')
-                .attr('class', 'grid')
-                .call(d3.axisLeft(y).tickSize(-innerWidth).tickFormat('').ticks(5));
+            if (showGrid) {
+                g.append('g')
+                    .attr('class', 'grid')
+                    .call(d3.axisLeft(y).tickSize(-innerWidth).tickFormat('').ticks(5));
+            }
 
             g.selectAll('.bar')
                 .data(data)
@@ -399,45 +449,49 @@
                 .attr('y', d => y(d.percentage))
                 .attr('height', d => innerHeight - y(d.percentage));
 
-            const capWidth = x.bandwidth() * 0.3;
-            const errorGroups = g.selectAll('.error').data(data).enter().append('g');
+            if (!hideErrorBars) {
+                const capWidth = x.bandwidth() * 0.3;
+                const errorGroups = g.selectAll('.error').data(data).enter().append('g');
 
-            errorGroups.append('line')
-                .attr('x1', d => x(d.option) + x.bandwidth() / 2)
-                .attr('x2', d => x(d.option) + x.bandwidth() / 2)
-                .attr('y1', innerHeight).attr('y2', innerHeight)
-                .attr('stroke', '#333').attr('stroke-width', 2)
-                .transition().duration(650)
-                .attr('y1', d => y(d.lower)).attr('y2', d => y(d.upper));
+                errorGroups.append('line')
+                    .attr('x1', d => x(d.option) + x.bandwidth() / 2)
+                    .attr('x2', d => x(d.option) + x.bandwidth() / 2)
+                    .attr('y1', innerHeight).attr('y2', innerHeight)
+                    .attr('stroke', '#333').attr('stroke-width', 2)
+                    .transition().duration(650)
+                    .attr('y1', d => y(d.lower)).attr('y2', d => y(d.upper));
 
-            errorGroups.append('line')
-                .attr('x1', d => x(d.option) + x.bandwidth() / 2 - capWidth / 2)
-                .attr('x2', d => x(d.option) + x.bandwidth() / 2 + capWidth / 2)
-                .attr('y1', innerHeight).attr('y2', innerHeight)
-                .attr('stroke', '#333').attr('stroke-width', 2)
-                .transition().duration(650)
-                .attr('y1', d => y(d.lower)).attr('y2', d => y(d.lower));
+                errorGroups.append('line')
+                    .attr('x1', d => x(d.option) + x.bandwidth() / 2 - capWidth / 2)
+                    .attr('x2', d => x(d.option) + x.bandwidth() / 2 + capWidth / 2)
+                    .attr('y1', innerHeight).attr('y2', innerHeight)
+                    .attr('stroke', '#333').attr('stroke-width', 2)
+                    .transition().duration(650)
+                    .attr('y1', d => y(d.lower)).attr('y2', d => y(d.lower));
 
-            errorGroups.append('line')
-                .attr('x1', d => x(d.option) + x.bandwidth() / 2 - capWidth / 2)
-                .attr('x2', d => x(d.option) + x.bandwidth() / 2 + capWidth / 2)
-                .attr('y1', innerHeight).attr('y2', innerHeight)
-                .attr('stroke', '#333').attr('stroke-width', 2)
-                .transition().duration(650)
-                .attr('y1', d => y(d.upper)).attr('y2', d => y(d.upper));
+                errorGroups.append('line')
+                    .attr('x1', d => x(d.option) + x.bandwidth() / 2 - capWidth / 2)
+                    .attr('x2', d => x(d.option) + x.bandwidth() / 2 + capWidth / 2)
+                    .attr('y1', innerHeight).attr('y2', innerHeight)
+                    .attr('stroke', '#333').attr('stroke-width', 2)
+                    .transition().duration(650)
+                    .attr('y1', d => y(d.upper)).attr('y2', d => y(d.upper));
+            }
 
-            g.selectAll('.value-label')
-                .data(data)
-                .enter()
-                .append('text')
-                .attr('class', 'value-label')
-                .attr('x', d => x(d.option) + x.bandwidth() / 2)
-                .attr('text-anchor', 'middle')
-                .attr('y', innerHeight)
-                .style('font-size', '13px').style('font-weight', 600).style('fill', '#333')
-                .transition().duration(650)
-                .attr('y', d => y(d.upper) - 10)
-                .text(d => `${d.percentage.toFixed(1)}%`);
+            if (showLabels) {
+                g.selectAll('.value-label')
+                    .data(data)
+                    .enter()
+                    .append('text')
+                    .attr('class', 'value-label')
+                    .attr('x', d => x(d.option) + x.bandwidth() / 2)
+                    .attr('text-anchor', 'middle')
+                    .attr('y', innerHeight)
+                    .style('font-size', '13px').style('font-weight', 600).style('fill', '#333')
+                    .transition().duration(650)
+                    .attr('y', d => y(d.upper !== null ? d.upper : d.percentage) - 10)
+                    .text(d => `${d.percentage.toFixed(1)}%`);
+            }
 
             const xAxis = g.append('g')
                 .attr('class', 'axis')
@@ -472,10 +526,12 @@
             const x = d3.scaleLinear().domain([0, 100]).range([0, innerWidth]);
             const y = d3.scaleBand().domain(data.map(d => d.option)).range([0, innerHeight]).padding(0.35);
 
-            g.append('g')
-                .attr('class', 'grid')
-                .attr('transform', `translate(0,${innerHeight})`)
-                .call(d3.axisBottom(x).tickSize(-innerHeight).tickFormat('').ticks(5));
+            if (showGrid) {
+                g.append('g')
+                    .attr('class', 'grid')
+                    .attr('transform', `translate(0,${innerHeight})`)
+                    .call(d3.axisBottom(x).tickSize(-innerHeight).tickFormat('').ticks(5));
+            }
 
             g.selectAll('.bar')
                 .data(data)
@@ -491,45 +547,49 @@
                 .transition().duration(650).ease(d3.easeCubicOut)
                 .attr('width', d => x(d.percentage));
 
-            const capHeight = y.bandwidth() * 0.3;
-            const errorGroups = g.selectAll('.error').data(data).enter().append('g');
+            if (!hideErrorBars) {
+                const capHeight = y.bandwidth() * 0.3;
+                const errorGroups = g.selectAll('.error').data(data).enter().append('g');
 
-            errorGroups.append('line')
-                .attr('y1', d => y(d.option) + y.bandwidth() / 2)
-                .attr('y2', d => y(d.option) + y.bandwidth() / 2)
-                .attr('x1', 0).attr('x2', 0)
-                .attr('stroke', '#333').attr('stroke-width', 2)
-                .transition().duration(650)
-                .attr('x1', d => x(d.lower)).attr('x2', d => x(d.upper));
+                errorGroups.append('line')
+                    .attr('y1', d => y(d.option) + y.bandwidth() / 2)
+                    .attr('y2', d => y(d.option) + y.bandwidth() / 2)
+                    .attr('x1', 0).attr('x2', 0)
+                    .attr('stroke', '#333').attr('stroke-width', 2)
+                    .transition().duration(650)
+                    .attr('x1', d => x(d.lower)).attr('x2', d => x(d.upper));
 
-            errorGroups.append('line')
-                .attr('y1', d => y(d.option) + y.bandwidth() / 2 - capHeight / 2)
-                .attr('y2', d => y(d.option) + y.bandwidth() / 2 + capHeight / 2)
-                .attr('x1', 0).attr('x2', 0)
-                .attr('stroke', '#333').attr('stroke-width', 2)
-                .transition().duration(650)
-                .attr('x1', d => x(d.lower)).attr('x2', d => x(d.lower));
+                errorGroups.append('line')
+                    .attr('y1', d => y(d.option) + y.bandwidth() / 2 - capHeight / 2)
+                    .attr('y2', d => y(d.option) + y.bandwidth() / 2 + capHeight / 2)
+                    .attr('x1', 0).attr('x2', 0)
+                    .attr('stroke', '#333').attr('stroke-width', 2)
+                    .transition().duration(650)
+                    .attr('x1', d => x(d.lower)).attr('x2', d => x(d.lower));
 
-            errorGroups.append('line')
-                .attr('y1', d => y(d.option) + y.bandwidth() / 2 - capHeight / 2)
-                .attr('y2', d => y(d.option) + y.bandwidth() / 2 + capHeight / 2)
-                .attr('x1', 0).attr('x2', 0)
-                .attr('stroke', '#333').attr('stroke-width', 2)
-                .transition().duration(650)
-                .attr('x1', d => x(d.upper)).attr('x2', d => x(d.upper));
+                errorGroups.append('line')
+                    .attr('y1', d => y(d.option) + y.bandwidth() / 2 - capHeight / 2)
+                    .attr('y2', d => y(d.option) + y.bandwidth() / 2 + capHeight / 2)
+                    .attr('x1', 0).attr('x2', 0)
+                    .attr('stroke', '#333').attr('stroke-width', 2)
+                    .transition().duration(650)
+                    .attr('x1', d => x(d.upper)).attr('x2', d => x(d.upper));
+            }
 
-            g.selectAll('.value-label')
-                .data(data)
-                .enter()
-                .append('text')
-                .attr('class', 'value-label')
-                .attr('y', d => y(d.option) + y.bandwidth() / 2)
-                .attr('dy', '0.35em')
-                .attr('x', 0)
-                .style('font-size', '13px').style('font-weight', 600).style('fill', '#333')
-                .transition().duration(650)
-                .attr('x', d => x(d.upper) + 10)
-                .text(d => `${d.percentage.toFixed(1)}%`);
+            if (showLabels) {
+                g.selectAll('.value-label')
+                    .data(data)
+                    .enter()
+                    .append('text')
+                    .attr('class', 'value-label')
+                    .attr('y', d => y(d.option) + y.bandwidth() / 2)
+                    .attr('dy', '0.35em')
+                    .attr('x', 0)
+                    .style('font-size', '13px').style('font-weight', 600).style('fill', '#333')
+                    .transition().duration(650)
+                    .attr('x', d => x(d.upper !== null ? d.upper : d.percentage) + 10)
+                    .text(d => `${d.percentage.toFixed(1)}%`);
+            }
 
             g.append('g').attr('class', 'axis').call(d3.axisLeft(y));
             g.append('g')
@@ -542,10 +602,15 @@
     function generateChart() {
         const question = document.getElementById('question').value;
         const totalN = parseInt(document.getElementById('totalN').value);
-        const confidenceLevel = parseInt(document.getElementById('confidence').value);
+        const confidenceRaw = document.getElementById('confidence').value;
+        const confidenceLevel = confidenceRaw === 'none' ? 'none' : parseInt(confidenceRaw);
+        const hideErrorBars = confidenceLevel === 'none';
         const orientation = document.getElementById('orientation').value;
         const theme = document.getElementById('theme').value;
         const useCustomColors = document.getElementById('custom-colors-toggle').checked;
+        const showLabels = document.getElementById('show-labels-toggle').checked;
+        const showGrid = document.getElementById('show-gridlines-toggle').checked;
+        const questionType = document.getElementById('question-type').value;
 
         const rows = document.querySelectorAll('.response-row');
         const responses = [];
@@ -559,7 +624,7 @@
         });
 
         if (!question || !totalN || responses.length === 0) {
-            alert('Please fill in the question name, total N, and at least one response option.');
+            alert('Please fill in the graph title, total N, and at least one response option.');
             return;
         }
 
@@ -569,32 +634,35 @@
                 option: r.option,
                 count: r.count,
                 percentage: ci.proportion * 100,
-                lower: ci.lower * 100,
-                upper: ci.upper * 100,
+                lower: ci.lower !== null ? ci.lower * 100 : null,
+                upper: ci.upper !== null ? ci.upper * 100 : null,
                 color: useCustomColors ? r.color : getThemeColor(theme, i, responses.length)
             };
         });
 
-        renderChart(data, orientation);
+        renderChart(data, orientation, { showGrid, showLabels, hideErrorBars });
 
         const tableBody = document.getElementById('table-body');
         tableBody.innerHTML = '';
         data.forEach(d => {
-            const marginOfError = Math.max(d.percentage - d.lower, d.upper - d.percentage);
+            const hasCI = d.lower !== null && d.upper !== null;
+            const marginOfError = hasCI ? Math.max(d.percentage - d.lower, d.upper - d.percentage) : null;
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${d.option}</td>
                 <td>${d.count}</td>
                 <td>${d.percentage.toFixed(2)}%</td>
-                <td>&plusmn;${marginOfError.toFixed(2)}%</td>
-                <td>${d.lower.toFixed(2)}%</td>
-                <td>${d.upper.toFixed(2)}%</td>
+                <td>${hasCI ? '&plusmn;' + marginOfError.toFixed(2) + '%' : '&mdash;'}</td>
+                <td>${hasCI ? d.lower.toFixed(2) + '%' : '&mdash;'}</td>
+                <td>${hasCI ? d.upper.toFixed(2) + '%' : '&mdash;'}</td>
             `;
             tableBody.appendChild(row);
         });
 
         document.getElementById('question-title').textContent = question;
-        document.getElementById('sample-size').textContent = `Total responses: ${totalN}`;
+        document.getElementById('sample-size').textContent = questionType === 'multi'
+            ? `Total respondents: ${totalN} (check all that apply — percentages may not sum to 100%)`
+            : `Total responses: ${totalN}`;
         document.getElementById('results').style.display = 'block';
     }
 
@@ -622,8 +690,15 @@
             canvas.width = w * scale;
             canvas.height = h * scale;
             const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            const bgMode = document.getElementById('export-bg').value;
+            if (bgMode === 'white') {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            } else if (bgMode === 'custom') {
+                ctx.fillStyle = document.getElementById('export-bg-color').value;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+            // 'transparent' mode: leave the canvas as-is (transparent alpha channel)
             ctx.scale(scale, scale);
             ctx.drawImage(img, 0, 0, w, h);
             URL.revokeObjectURL(url);
@@ -637,11 +712,17 @@
         img.src = url;
     }
 
+    function toggleExportBgColor() {
+        const mode = document.getElementById('export-bg').value;
+        document.getElementById('export-bg-color').style.display = mode === 'custom' ? 'inline-block' : 'none';
+    }
+
     document.getElementById('add-response').addEventListener('click', addResponseField);
     document.getElementById('generate').addEventListener('click', generateChart);
     document.getElementById('export-btn').addEventListener('click', exportChartAsPNG);
     document.getElementById('custom-colors-toggle').addEventListener('change', toggleCustomColors);
     document.getElementById('responses-container').addEventListener('click', handleTableClick);
+    document.getElementById('export-bg').addEventListener('change', toggleExportBgColor);
     updateRemoveButtons();
 </script>
 </body>
