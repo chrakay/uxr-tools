@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Survey Results with Confidence Intervals</title>
+<title>Survey Graph Maker</title>
 <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
 <style>
     * { box-sizing: border-box; }
@@ -15,11 +15,30 @@
         padding: 40px 20px;
     }
     .app {
-        max-width: 920px;
+        max-width: 1400px;
         margin: 0 auto;
-        display: flex;
-        flex-direction: column;
+        display: grid;
+        grid-template-columns: 1fr;
         gap: 24px;
+        align-items: start;
+    }
+    @media (min-width: 980px) {
+        .app {
+            grid-template-columns: minmax(360px, 460px) 1fr;
+        }
+        .results-column {
+            position: sticky;
+            top: 24px;
+        }
+    }
+    .placeholder-card {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 320px;
+        color: #9aa0a8;
+        font-size: 14px;
+        text-align: center;
     }
     .card {
         background: #fff;
@@ -193,16 +212,24 @@
 <body>
 <div class="app">
     <div class="card">
-        <h1>Survey Data Input</h1>
+        <h1>Survey Graph Maker</h1>
 
         <div class="field">
             <label>Graph Title</label>
             <input type="text" id="question" placeholder="e.g., How satisfied are you with our service?">
         </div>
 
+        <div class="field">
+            <label>Question Type</label>
+            <select id="question-type">
+                <option value="single" selected>Multiple choice</option>
+                <option value="multi">Check all that apply</option>
+            </select>
+        </div>
+
         <div class="field-row">
             <div class="field">
-                <label>Total N (total number of respondents)</label>
+                <label>Total number of respondents (N)</label>
                 <input type="number" id="totalN" placeholder="e.g., 200" min="1">
             </div>
             <div class="field">
@@ -217,15 +244,7 @@
         </div>
 
         <div class="field">
-            <label>Question Type</label>
-            <select id="question-type">
-                <option value="single" selected>Single choice (select one)</option>
-                <option value="multi">Check all that apply (multiple choice)</option>
-            </select>
-        </div>
-
-        <div class="field">
-            <label>Response Options and Counts</label>
+            <label>Responses</label>
             <table id="responses-container" class="responses-table">
                 <thead>
                     <tr>
@@ -257,8 +276,8 @@
             <div class="field">
                 <label>Bar Orientation</label>
                 <select id="orientation">
-                    <option value="horizontal" selected>Horizontal bars</option>
-                    <option value="vertical">Vertical bars</option>
+                    <option value="horizontal">Horizontal bars</option>
+                    <option value="vertical" selected>Vertical bars</option>
                 </select>
             </div>
             <div class="field">
@@ -287,40 +306,51 @@
             <label for="show-gridlines-toggle">Show background gridlines</label>
         </div>
 
+        <div class="checkbox-field">
+            <input type="checkbox" id="show-counts-toggle">
+            <label for="show-counts-toggle">Show respondent count (#) under bars</label>
+        </div>
+
         <button id="generate" class="btn-primary" type="button">Generate Chart</button>
     </div>
 
-    <div id="results" class="card">
-        <div class="results-header">
-            <div>
-                <h2 id="question-title"></h2>
-                <div id="sample-size"></div>
-            </div>
-            <div class="export-controls">
-                <select id="export-bg">
-                    <option value="transparent" selected>Transparent</option>
-                    <option value="white">White background</option>
-                    <option value="custom">Custom color</option>
-                </select>
-                <input type="color" id="export-bg-color" value="#ffffff" style="display:none;">
-                <button id="export-btn" class="btn-secondary" type="button">Export PNG</button>
-            </div>
+    <div class="results-column">
+        <div id="placeholder" class="card placeholder-card">
+            Fill in the form and click Generate Chart to see your graph here.
         </div>
-        <div id="plot"></div>
-        <h3>Detailed Results</h3>
-        <table id="results-table">
-            <thead>
-                <tr>
-                    <th>Response Option</th>
-                    <th>Count</th>
-                    <th>Percentage</th>
-                    <th>Margin of Error</th>
-                    <th>Lower Bound</th>
-                    <th>Upper Bound</th>
-                </tr>
-            </thead>
-            <tbody id="table-body"></tbody>
-        </table>
+
+        <div id="results" class="card">
+            <div class="results-header">
+                <div>
+                    <h2 id="question-title"></h2>
+                    <div id="sample-size"></div>
+                </div>
+                <div class="export-controls">
+                    <select id="export-bg">
+                        <option value="transparent" selected>Transparent</option>
+                        <option value="white">White background</option>
+                        <option value="custom">Custom color</option>
+                    </select>
+                    <input type="color" id="export-bg-color" value="#ffffff" style="display:none;">
+                    <button id="export-btn" class="btn-secondary" type="button">Export PNG</button>
+                </div>
+            </div>
+            <div id="plot"></div>
+            <h3>Detailed Results</h3>
+            <table id="results-table">
+                <thead>
+                    <tr>
+                        <th>Response Option</th>
+                        <th>Count</th>
+                        <th>Percentage</th>
+                        <th>Margin of Error</th>
+                        <th>Lower Bound</th>
+                        <th>Upper Bound</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body"></tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -404,6 +434,7 @@
         const showGrid = chartOptions && chartOptions.showGrid;
         const showLabels = chartOptions && chartOptions.showLabels;
         const hideErrorBars = chartOptions && chartOptions.hideErrorBars;
+        const showCounts = chartOptions && chartOptions.showCounts;
         const container = d3.select('#plot');
         container.selectAll('*').remove();
         const containerWidth = container.node().clientWidth || 800;
@@ -491,6 +522,24 @@
                     .transition().duration(650)
                     .attr('y', d => y(d.upper !== null ? d.upper : d.percentage) - 10)
                     .text(d => `${d.percentage.toFixed(1)}%`);
+            }
+
+            if (showCounts) {
+                g.selectAll('.count-label')
+                    .data(data)
+                    .enter()
+                    .append('text')
+                    .attr('class', 'count-label')
+                    .attr('x', d => x(d.option) + x.bandwidth() / 2)
+                    .attr('text-anchor', 'middle')
+                    .attr('y', innerHeight)
+                    .style('font-size', '11px')
+                    .style('fill', d => (innerHeight - y(d.percentage) > 24) ? '#fff' : '#333')
+                    .style('opacity', 0)
+                    .transition().duration(650)
+                    .style('opacity', 1)
+                    .attr('y', d => (innerHeight - y(d.percentage) > 24) ? innerHeight - 8 : y(d.percentage) - 6)
+                    .text(d => `n=${d.count}`);
             }
 
             const xAxis = g.append('g')
@@ -591,6 +640,24 @@
                     .text(d => `${d.percentage.toFixed(1)}%`);
             }
 
+            if (showCounts) {
+                g.selectAll('.count-label')
+                    .data(data)
+                    .enter()
+                    .append('text')
+                    .attr('class', 'count-label')
+                    .attr('y', d => y(d.option) + y.bandwidth() / 2)
+                    .attr('dy', '0.35em')
+                    .attr('x', 0)
+                    .style('font-size', '11px')
+                    .style('fill', d => (x(d.percentage) > 40) ? '#fff' : '#333')
+                    .style('opacity', 0)
+                    .transition().duration(650)
+                    .style('opacity', 1)
+                    .attr('x', d => (x(d.percentage) > 40) ? 8 : x(d.percentage) + 8)
+                    .text(d => `n=${d.count}`);
+            }
+
             g.append('g').attr('class', 'axis').call(d3.axisLeft(y));
             g.append('g')
                 .attr('class', 'axis')
@@ -610,6 +677,7 @@
         const useCustomColors = document.getElementById('custom-colors-toggle').checked;
         const showLabels = document.getElementById('show-labels-toggle').checked;
         const showGrid = document.getElementById('show-gridlines-toggle').checked;
+        const showCounts = document.getElementById('show-counts-toggle').checked;
         const questionType = document.getElementById('question-type').value;
 
         const rows = document.querySelectorAll('.response-row');
@@ -640,7 +708,7 @@
             };
         });
 
-        renderChart(data, orientation, { showGrid, showLabels, hideErrorBars });
+        renderChart(data, orientation, { showGrid, showLabels, hideErrorBars, showCounts });
 
         const tableBody = document.getElementById('table-body');
         tableBody.innerHTML = '';
@@ -663,6 +731,7 @@
         document.getElementById('sample-size').textContent = questionType === 'multi'
             ? `Total respondents: ${totalN} (check all that apply — percentages may not sum to 100%)`
             : `Total responses: ${totalN}`;
+        document.getElementById('placeholder').style.display = 'none';
         document.getElementById('results').style.display = 'block';
     }
 
