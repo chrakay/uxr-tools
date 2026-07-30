@@ -1,222 +1,648 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Survey Results with Confidence Intervals</title>
-    <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist@2.27.0/plotly.min.js"></script>
-    <style>
-        #results {
-            display: none;
-        }
-        #plot {
-            width: 100%;
-            height: 500px;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Survey Results with Confidence Intervals</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<style>
+    * { box-sizing: border-box; }
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: #f7f8fa;
+        color: #1a1a1a;
+        margin: 0;
+        padding: 40px 20px;
+    }
+    .app {
+        max-width: 920px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+    }
+    .card {
+        background: #fff;
+        border-radius: 12px;
+        padding: 32px;
+        border: 1px solid #eceef1;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    h1 {
+        font-size: 20px;
+        font-weight: 600;
+        margin: 0 0 24px;
+    }
+    h2 {
+        font-size: 20px;
+        font-weight: 600;
+        margin: 0;
+    }
+    h3 {
+        font-size: 15px;
+        font-weight: 600;
+        color: #444;
+        margin: 0 0 12px;
+    }
+    label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        color: #555;
+        margin-bottom: 6px;
+    }
+    .field { margin-bottom: 20px; }
+    .field-row { display: flex; gap: 20px; }
+    .field-row .field { flex: 1; margin-bottom: 20px; }
+
+    input[type="text"], input[type="number"], select {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #d8dbe0;
+        border-radius: 8px;
+        font-size: 14px;
+        font-family: inherit;
+        color: #1a1a1a;
+        background: #fff;
+        transition: border-color .15s, box-shadow .15s;
+    }
+    input[type="text"]:focus, input[type="number"]:focus, select:focus {
+        outline: none;
+        border-color: #4a90e2;
+        box-shadow: 0 0 0 3px rgba(74,144,226,0.15);
+    }
+    input[type="color"] {
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        border: 1px solid #d8dbe0;
+        border-radius: 6px;
+        cursor: pointer;
+        background: #fff;
+    }
+
+    .responses-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+    .responses-table th {
+        text-align: left;
+        font-size: 12px;
+        font-weight: 600;
+        color: #8a8f98;
+        padding: 0 6px 6px 0;
+    }
+    .responses-table td { padding: 5px 6px 5px 0; vertical-align: middle; }
+    .response-option { width: 100%; }
+    .response-count { width: 100px; }
+    .color-cell { display: none; width: 44px; }
+    .responses-table.show-colors .color-cell { display: table-cell; }
+    .remove-cell { width: 32px; }
+    .remove-row-btn {
+        background: none;
+        border: none;
+        color: #b3454a;
+        cursor: pointer;
+        font-size: 18px;
+        line-height: 1;
+        padding: 4px 8px;
+        border-radius: 6px;
+    }
+    .remove-row-btn:hover { background: #fbeaea; }
+    .remove-row-btn:disabled { opacity: 0.25; cursor: not-allowed; background: none; }
+
+    .checkbox-field {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: #555;
+        margin-bottom: 16px;
+    }
+    .checkbox-field label { margin: 0; font-weight: 500; }
+    .checkbox-field input { width: auto; }
+
+    .btn-secondary {
+        background: #f1f3f5;
+        color: #333;
+        border: 1px solid #d8dbe0;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .btn-secondary:hover { background: #e6e8eb; }
+
+    .btn-primary {
+        background: #4a90e2;
+        color: #fff;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        width: 100%;
+        margin-top: 8px;
+    }
+    .btn-primary:hover { background: #3a7bc8; }
+
+    #results { display: none; }
+    .results-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+        margin-bottom: 4px;
+    }
+    #sample-size { color: #666; font-size: 14px; margin-bottom: 20px; }
+    #plot { width: 100%; margin-bottom: 28px; }
+    #plot svg { display: block; }
+
+    #results-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    #results-table th {
+        text-align: left;
+        padding: 10px 12px;
+        background: #f7f8fa;
+        font-weight: 600;
+        color: #555;
+        border-bottom: 2px solid #eceef1;
+    }
+    #results-table td { padding: 10px 12px; border-bottom: 1px solid #eceef1; }
+    #results-table tr:hover td { background: #fafbfc; }
+
+    .grid line { stroke: #eee; }
+    .grid .domain { display: none; }
+    .axis .domain, .axis line { stroke: #ccc; }
+    .axis text { fill: #666; font-size: 12px; }
+</style>
 </head>
 <body>
-    <div class="input-section">
-        <h2>Survey Data Input</h2>
-        
-        <label>Question Name:</label>
-        <input type="text" id="question" placeholder="e.g., How satisfied are you with our service?">
-        
-        <label>Total N (total number of respondents):</label>
-        <input type="number" id="totalN" placeholder="e.g., 200" min="1">
-        
-        <label>Response Options and Counts:</label>
-        <table id="responses-container">
-            <tr class="response-row">
-                <td><input type="text" placeholder="Response option 1" class="response-option" size="40"></td>
-                <td><input type="number" placeholder="Count" min="0" class="response-count" size="10"></td>
-            </tr>
-            <tr class="response-row">
-                <td><input type="text" placeholder="Response option 2" class="response-option" size="40"></td>
-                <td><input type="number" placeholder="Count" min="0" class="response-count" size="10"></td>
-            </tr>
-        </table>
-        
-        <button id="add-response">+ Add Response Option</button>
-        
-        <label>Confidence Level:</label>
-        <select id="confidence">
-            <option value="90">90%</option>
-            <option value="95" selected>95%</option>
-            <option value="99">99%</option>
-        </select>
-        
-        <button id="generate">Generate Chart</button>
+<div class="app">
+    <div class="card">
+        <h1>Survey Data Input</h1>
+
+        <div class="field">
+            <label>Question Name</label>
+            <input type="text" id="question" placeholder="e.g., How satisfied are you with our service?">
+        </div>
+
+        <div class="field-row">
+            <div class="field">
+                <label>Total N (total number of respondents)</label>
+                <input type="number" id="totalN" placeholder="e.g., 200" min="1">
+            </div>
+            <div class="field">
+                <label>Confidence Level</label>
+                <select id="confidence">
+                    <option value="90">90%</option>
+                    <option value="95" selected>95%</option>
+                    <option value="99">99%</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="field">
+            <label>Response Options and Counts</label>
+            <table id="responses-container" class="responses-table">
+                <thead>
+                    <tr>
+                        <th>Option</th>
+                        <th>Count</th>
+                        <th class="color-cell">Color</th>
+                        <th class="remove-cell"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="response-row">
+                        <td><input type="text" placeholder="Response option 1" class="response-option"></td>
+                        <td><input type="number" placeholder="Count" min="0" class="response-count"></td>
+                        <td class="color-cell"><input type="color" class="response-color" value="#4a90e2"></td>
+                        <td class="remove-cell"><button class="remove-row-btn" title="Remove row" disabled>&times;</button></td>
+                    </tr>
+                    <tr class="response-row">
+                        <td><input type="text" placeholder="Response option 2" class="response-option"></td>
+                        <td><input type="number" placeholder="Count" min="0" class="response-count"></td>
+                        <td class="color-cell"><input type="color" class="response-color" value="#f28e2b"></td>
+                        <td class="remove-cell"><button class="remove-row-btn" title="Remove row">&times;</button></td>
+                    </tr>
+                </tbody>
+            </table>
+            <button id="add-response" class="btn-secondary" type="button">+ Add Response Option</button>
+        </div>
+
+        <div class="field-row">
+            <div class="field">
+                <label>Bar Orientation</label>
+                <select id="orientation">
+                    <option value="horizontal" selected>Horizontal bars</option>
+                    <option value="vertical">Vertical bars</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>Color Theme</label>
+                <select id="theme">
+                    <option value="classic" selected>Classic Blue</option>
+                    <option value="categorical">Categorical (multi-color)</option>
+                    <option value="monochrome">Monochrome Blue</option>
+                    <option value="pastel">Pastel</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="checkbox-field">
+            <input type="checkbox" id="custom-colors-toggle">
+            <label for="custom-colors-toggle">Use custom colors per response option (overrides theme)</label>
+        </div>
+
+        <button id="generate" class="btn-primary" type="button">Generate Chart</button>
     </div>
 
-    <div id="results">
-        <h1 id="question-title"></h1>
-        <div id="sample-size"></div>
+    <div id="results" class="card">
+        <div class="results-header">
+            <div>
+                <h2 id="question-title"></h2>
+                <div id="sample-size"></div>
+            </div>
+            <button id="export-btn" class="btn-secondary" type="button">Export PNG</button>
+        </div>
         <div id="plot"></div>
         <h3>Detailed Results</h3>
         <table id="results-table">
-                <thead>
-                    <tr>
-                        <th>Response Option</th>
-                        <th>Count</th>
-                        <th>Percentage</th>
-                        <th>Margin of Error</th>
-                        <th>Lower Bound</th>
-                        <th>Upper Bound</th>
-                    </tr>
-                </thead>
-                <tbody id="table-body">
-                </tbody>
-            </table>
-        </div>
+            <thead>
+                <tr>
+                    <th>Response Option</th>
+                    <th>Count</th>
+                    <th>Percentage</th>
+                    <th>Margin of Error</th>
+                    <th>Lower Bound</th>
+                    <th>Upper Bound</th>
+                </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+        </table>
     </div>
+</div>
 
-    <script>
-        let responseCount = 2;
+<script>
+    let responseCount = 2;
+    const defaultColorCycle = ['#4a90e2', '#f28e2b', '#59a14f', '#e15759', '#af7aa1', '#76b7b2', '#edc949', '#ff9da7'];
 
-        function addResponseField() {
-            responseCount++;
-            const container = document.getElementById('responses-container');
-            const tr = document.createElement('tr');
-            tr.className = 'response-row';
-            tr.innerHTML = `
-                <td><input type="text" placeholder="Response option ${responseCount}" class="response-option" size="40"></td>
-                <td><input type="number" placeholder="Count" min="0" class="response-count" size="10"></td>
-            `;
-            container.appendChild(tr);
+    const themes = {
+        classic: ['#4a90e2'],
+        categorical: ['#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f', '#edc949', '#af7aa1', '#ff9da7', '#9c755f', '#bab0ac'],
+        monochrome: ['#0d3b66', '#1d5c99', '#2e7cc2', '#5b9bd5', '#8fbde0', '#c3dcee'],
+        pastel: ['#fbb4ae', '#b3cde3', '#ccebc5', '#decbe4', '#fed9a6', '#ffffcc', '#e5d8bd', '#fddaec']
+    };
+
+    function getThemeColor(theme, index, n) {
+        const palette = themes[theme] || themes.classic;
+        if (theme === 'classic') return palette[0];
+        if (theme === 'monochrome') {
+            const scale = d3.scaleLinear().domain([0, Math.max(n - 1, 1)]).range([0, palette.length - 1]);
+            return palette[Math.round(scale(index))];
+        }
+        return palette[index % palette.length];
+    }
+
+    function addResponseField() {
+        responseCount++;
+        const tbody = document.querySelector('#responses-container tbody');
+        const tr = document.createElement('tr');
+        tr.className = 'response-row';
+        const color = defaultColorCycle[(responseCount - 1) % defaultColorCycle.length];
+        tr.innerHTML = `
+            <td><input type="text" placeholder="Response option ${responseCount}" class="response-option"></td>
+            <td><input type="number" placeholder="Count" min="0" class="response-count"></td>
+            <td class="color-cell"><input type="color" class="response-color" value="${color}"></td>
+            <td class="remove-cell"><button class="remove-row-btn" title="Remove row">&times;</button></td>
+        `;
+        tbody.appendChild(tr);
+        updateRemoveButtons();
+    }
+
+    function updateRemoveButtons() {
+        const rows = document.querySelectorAll('.response-row');
+        rows.forEach(row => {
+            const btn = row.querySelector('.remove-row-btn');
+            btn.disabled = rows.length <= 1;
+        });
+    }
+
+    function handleTableClick(e) {
+        if (e.target.classList.contains('remove-row-btn')) {
+            const rows = document.querySelectorAll('.response-row');
+            if (rows.length > 1) {
+                e.target.closest('tr').remove();
+                updateRemoveButtons();
+            }
+        }
+    }
+
+    function toggleCustomColors() {
+        const table = document.getElementById('responses-container');
+        const checked = document.getElementById('custom-colors-toggle').checked;
+        table.classList.toggle('show-colors', checked);
+    }
+
+    function calculateCI(count, total, confidenceLevel) {
+        const p = count / total;
+        const se = Math.sqrt((p * (1 - p)) / total);
+        const zScores = { 90: 1.645, 95: 1.96, 99: 2.576 };
+        const z = zScores[confidenceLevel];
+        return {
+            proportion: p,
+            lower: Math.max(0, p - z * se),
+            upper: Math.min(1, p + z * se)
+        };
+    }
+
+    function renderChart(data, orientation) {
+        const container = d3.select('#plot');
+        container.selectAll('*').remove();
+        const containerWidth = container.node().clientWidth || 800;
+        const n = data.length;
+        const fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+
+        if (orientation === 'vertical') {
+            const margin = { top: 30, right: 30, bottom: 110, left: 60 };
+            const width = containerWidth;
+            const height = 520;
+            const innerWidth = width - margin.left - margin.right;
+            const innerHeight = height - margin.top - margin.bottom;
+
+            const svg = container.append('svg')
+                .attr('viewBox', `0 0 ${width} ${height}`)
+                .attr('width', '100%')
+                .attr('height', height)
+                .style('font-family', fontFamily);
+
+            const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+            const x = d3.scaleBand().domain(data.map(d => d.option)).range([0, innerWidth]).padding(0.35);
+            const y = d3.scaleLinear().domain([0, 100]).range([innerHeight, 0]);
+
+            g.append('g')
+                .attr('class', 'grid')
+                .call(d3.axisLeft(y).tickSize(-innerWidth).tickFormat('').ticks(5));
+
+            g.selectAll('.bar')
+                .data(data)
+                .enter()
+                .append('rect')
+                .attr('class', 'bar')
+                .attr('x', d => x(d.option))
+                .attr('width', x.bandwidth())
+                .attr('y', innerHeight)
+                .attr('height', 0)
+                .attr('rx', 4)
+                .attr('fill', d => d.color)
+                .transition().duration(650).ease(d3.easeCubicOut)
+                .attr('y', d => y(d.percentage))
+                .attr('height', d => innerHeight - y(d.percentage));
+
+            const capWidth = x.bandwidth() * 0.3;
+            const errorGroups = g.selectAll('.error').data(data).enter().append('g');
+
+            errorGroups.append('line')
+                .attr('x1', d => x(d.option) + x.bandwidth() / 2)
+                .attr('x2', d => x(d.option) + x.bandwidth() / 2)
+                .attr('y1', innerHeight).attr('y2', innerHeight)
+                .attr('stroke', '#333').attr('stroke-width', 2)
+                .transition().duration(650)
+                .attr('y1', d => y(d.lower)).attr('y2', d => y(d.upper));
+
+            errorGroups.append('line')
+                .attr('x1', d => x(d.option) + x.bandwidth() / 2 - capWidth / 2)
+                .attr('x2', d => x(d.option) + x.bandwidth() / 2 + capWidth / 2)
+                .attr('y1', innerHeight).attr('y2', innerHeight)
+                .attr('stroke', '#333').attr('stroke-width', 2)
+                .transition().duration(650)
+                .attr('y1', d => y(d.lower)).attr('y2', d => y(d.lower));
+
+            errorGroups.append('line')
+                .attr('x1', d => x(d.option) + x.bandwidth() / 2 - capWidth / 2)
+                .attr('x2', d => x(d.option) + x.bandwidth() / 2 + capWidth / 2)
+                .attr('y1', innerHeight).attr('y2', innerHeight)
+                .attr('stroke', '#333').attr('stroke-width', 2)
+                .transition().duration(650)
+                .attr('y1', d => y(d.upper)).attr('y2', d => y(d.upper));
+
+            g.selectAll('.value-label')
+                .data(data)
+                .enter()
+                .append('text')
+                .attr('class', 'value-label')
+                .attr('x', d => x(d.option) + x.bandwidth() / 2)
+                .attr('text-anchor', 'middle')
+                .attr('y', innerHeight)
+                .style('font-size', '13px').style('font-weight', 600).style('fill', '#333')
+                .transition().duration(650)
+                .attr('y', d => y(d.upper) - 10)
+                .text(d => `${d.percentage.toFixed(1)}%`);
+
+            const xAxis = g.append('g')
+                .attr('class', 'axis')
+                .attr('transform', `translate(0,${innerHeight})`)
+                .call(d3.axisBottom(x));
+            xAxis.selectAll('text')
+                .attr('transform', 'rotate(-35)')
+                .style('text-anchor', 'end')
+                .attr('dx', '-0.5em')
+                .attr('dy', '0.15em');
+
+            g.append('g')
+                .attr('class', 'axis')
+                .call(d3.axisLeft(y).ticks(5).tickFormat(d => d + '%'));
+
+        } else {
+            const margin = { top: 20, right: 70, bottom: 50, left: 170 };
+            const barSlot = 56;
+            const width = containerWidth;
+            const height = n * barSlot + margin.top + margin.bottom;
+            const innerWidth = width - margin.left - margin.right;
+            const innerHeight = height - margin.top - margin.bottom;
+
+            const svg = container.append('svg')
+                .attr('viewBox', `0 0 ${width} ${height}`)
+                .attr('width', '100%')
+                .attr('height', height)
+                .style('font-family', fontFamily);
+
+            const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+            const x = d3.scaleLinear().domain([0, 100]).range([0, innerWidth]);
+            const y = d3.scaleBand().domain(data.map(d => d.option)).range([0, innerHeight]).padding(0.35);
+
+            g.append('g')
+                .attr('class', 'grid')
+                .attr('transform', `translate(0,${innerHeight})`)
+                .call(d3.axisBottom(x).tickSize(-innerHeight).tickFormat('').ticks(5));
+
+            g.selectAll('.bar')
+                .data(data)
+                .enter()
+                .append('rect')
+                .attr('class', 'bar')
+                .attr('y', d => y(d.option))
+                .attr('height', y.bandwidth())
+                .attr('x', 0)
+                .attr('width', 0)
+                .attr('rx', 4)
+                .attr('fill', d => d.color)
+                .transition().duration(650).ease(d3.easeCubicOut)
+                .attr('width', d => x(d.percentage));
+
+            const capHeight = y.bandwidth() * 0.3;
+            const errorGroups = g.selectAll('.error').data(data).enter().append('g');
+
+            errorGroups.append('line')
+                .attr('y1', d => y(d.option) + y.bandwidth() / 2)
+                .attr('y2', d => y(d.option) + y.bandwidth() / 2)
+                .attr('x1', 0).attr('x2', 0)
+                .attr('stroke', '#333').attr('stroke-width', 2)
+                .transition().duration(650)
+                .attr('x1', d => x(d.lower)).attr('x2', d => x(d.upper));
+
+            errorGroups.append('line')
+                .attr('y1', d => y(d.option) + y.bandwidth() / 2 - capHeight / 2)
+                .attr('y2', d => y(d.option) + y.bandwidth() / 2 + capHeight / 2)
+                .attr('x1', 0).attr('x2', 0)
+                .attr('stroke', '#333').attr('stroke-width', 2)
+                .transition().duration(650)
+                .attr('x1', d => x(d.lower)).attr('x2', d => x(d.lower));
+
+            errorGroups.append('line')
+                .attr('y1', d => y(d.option) + y.bandwidth() / 2 - capHeight / 2)
+                .attr('y2', d => y(d.option) + y.bandwidth() / 2 + capHeight / 2)
+                .attr('x1', 0).attr('x2', 0)
+                .attr('stroke', '#333').attr('stroke-width', 2)
+                .transition().duration(650)
+                .attr('x1', d => x(d.upper)).attr('x2', d => x(d.upper));
+
+            g.selectAll('.value-label')
+                .data(data)
+                .enter()
+                .append('text')
+                .attr('class', 'value-label')
+                .attr('y', d => y(d.option) + y.bandwidth() / 2)
+                .attr('dy', '0.35em')
+                .attr('x', 0)
+                .style('font-size', '13px').style('font-weight', 600).style('fill', '#333')
+                .transition().duration(650)
+                .attr('x', d => x(d.upper) + 10)
+                .text(d => `${d.percentage.toFixed(1)}%`);
+
+            g.append('g').attr('class', 'axis').call(d3.axisLeft(y));
+            g.append('g')
+                .attr('class', 'axis')
+                .attr('transform', `translate(0,${innerHeight})`)
+                .call(d3.axisBottom(x).ticks(5).tickFormat(d => d + '%'));
+        }
+    }
+
+    function generateChart() {
+        const question = document.getElementById('question').value;
+        const totalN = parseInt(document.getElementById('totalN').value);
+        const confidenceLevel = parseInt(document.getElementById('confidence').value);
+        const orientation = document.getElementById('orientation').value;
+        const theme = document.getElementById('theme').value;
+        const useCustomColors = document.getElementById('custom-colors-toggle').checked;
+
+        const rows = document.querySelectorAll('.response-row');
+        const responses = [];
+        rows.forEach(row => {
+            const option = row.querySelector('.response-option').value.trim();
+            const count = parseInt(row.querySelector('.response-count').value);
+            const color = row.querySelector('.response-color').value;
+            if (option && !isNaN(count)) {
+                responses.push({ option, count, color });
+            }
+        });
+
+        if (!question || !totalN || responses.length === 0) {
+            alert('Please fill in the question name, total N, and at least one response option.');
+            return;
         }
 
-        function calculateCI(count, total, confidenceLevel) {
-            const p = count / total;
-            const se = Math.sqrt((p * (1 - p)) / total);
-            
-            // Z-scores for different confidence levels
-            const zScores = {
-                90: 1.645,
-                95: 1.96,
-                99: 2.576
-            };
-            const z = zScores[confidenceLevel];
-            
+        const data = responses.map((r, i) => {
+            const ci = calculateCI(r.count, totalN, confidenceLevel);
             return {
-                proportion: p,
-                lower: Math.max(0, p - z * se),
-                upper: Math.min(1, p + z * se)
+                option: r.option,
+                count: r.count,
+                percentage: ci.proportion * 100,
+                lower: ci.lower * 100,
+                upper: ci.upper * 100,
+                color: useCustomColors ? r.color : getThemeColor(theme, i, responses.length)
             };
+        });
+
+        renderChart(data, orientation);
+
+        const tableBody = document.getElementById('table-body');
+        tableBody.innerHTML = '';
+        data.forEach(d => {
+            const marginOfError = Math.max(d.percentage - d.lower, d.upper - d.percentage);
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${d.option}</td>
+                <td>${d.count}</td>
+                <td>${d.percentage.toFixed(2)}%</td>
+                <td>&plusmn;${marginOfError.toFixed(2)}%</td>
+                <td>${d.lower.toFixed(2)}%</td>
+                <td>${d.upper.toFixed(2)}%</td>
+            `;
+            tableBody.appendChild(row);
+        });
+
+        document.getElementById('question-title').textContent = question;
+        document.getElementById('sample-size').textContent = `Total responses: ${totalN}`;
+        document.getElementById('results').style.display = 'block';
+    }
+
+    function exportChartAsPNG() {
+        const svgEl = document.querySelector('#plot svg');
+        if (!svgEl) {
+            alert('Generate a chart first.');
+            return;
         }
-
-        function generateChart() {
-            const question = document.getElementById('question').value;
-            const totalN = parseInt(document.getElementById('totalN').value);
-            const confidenceLevel = parseInt(document.getElementById('confidence').value);
-            
-            const options = document.querySelectorAll('.response-option');
-            const counts = document.querySelectorAll('.response-count');
-            
-            const responses = [];
-            for (let i = 0; i < options.length; i++) {
-                const option = options[i].value.trim();
-                const count = parseInt(counts[i].value);
-                if (option && !isNaN(count)) {
-                    responses.push({ option, count });
-                }
-            }
-
-            if (!question || !totalN || responses.length === 0) {
-                alert('Please fill in the question name, total N, and at least one response option.');
-                return;
-            }
-
-            // Prepare data for plotting
-            const yValues = [];
-            const xValues = [];
-            const errorMinus = [];
-            const errorPlus = [];
-            const text = [];
-
-            responses.forEach(r => {
-                const ci = calculateCI(r.count, totalN, confidenceLevel);
-                const percentage = ci.proportion * 100;
-                const lowerBound = ci.lower * 100;
-                const upperBound = ci.upper * 100;
-                
-                yValues.push(r.option);
-                xValues.push(percentage);
-                errorMinus.push(percentage - lowerBound);
-                errorPlus.push(upperBound - percentage);
-                text.push(`${r.count} (${percentage.toFixed(1)}%)`);
-            });
-
-            const trace = {
-                type: 'bar',
-                x: xValues,
-                y: yValues,
-                orientation: 'h',
-                marker: {
-                    color: '#4a90e2'
-                },
-                error_x: {
-                    type: 'data',
-                    symmetric: false,
-                    array: errorPlus,
-                    arrayminus: errorMinus,
-                    color: '#000',
-                    thickness: 2,
-                    width: 6
-                }
-            };
-
-            const layout = {
-                xaxis: {
-                    title: 'Percentage (%)',
-                    range: [0, 100]
-                },
-                yaxis: {
-                    title: ''
-                },
-                margin: {
-                    l: 150,
-                    r: 50,
-                    t: 20,
-                    b: 50
-                },
-                font: {
-                    family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                }
-            };
-
-            Plotly.newPlot('plot', [trace], layout, {responsive: true});
-            
-            // Populate table
-            const tableBody = document.getElementById('table-body');
-            tableBody.innerHTML = '';
-            
-            responses.forEach((r, i) => {
-                const ci = calculateCI(r.count, totalN, confidenceLevel);
-                const percentage = ci.proportion * 100;
-                const lowerBound = ci.lower * 100;
-                const upperBound = ci.upper * 100;
-                const marginOfError = Math.max(percentage - lowerBound, upperBound - percentage);
-                
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${r.option}</td>
-                    <td>${r.count}</td>
-                    <td>${percentage.toFixed(2)}%</td>
-                    <td>±${marginOfError.toFixed(2)}%</td>
-                    <td>${lowerBound.toFixed(2)}%</td>
-                    <td>${upperBound.toFixed(2)}%</td>
-                `;
-                tableBody.appendChild(row);
-            });
-            
-            document.getElementById('question-title').textContent = question;
-            document.getElementById('sample-size').textContent = `Total responses: ${totalN}`;
-            document.getElementById('results').style.display = 'block';
+        const serializer = new XMLSerializer();
+        let source = serializer.serializeToString(svgEl);
+        if (!source.match(/^<svg[^>]+xmlns="http:\/\/www\.w3\.org\/2000\/svg"/)) {
+            source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
         }
+        const viewBox = svgEl.viewBox.baseVal;
+        const w = viewBox && viewBox.width ? viewBox.width : svgEl.clientWidth;
+        const h = viewBox && viewBox.height ? viewBox.height : svgEl.clientHeight;
+        const scale = 2;
 
-        document.getElementById('add-response').addEventListener('click', addResponseField);
-        document.getElementById('generate').addEventListener('click', generateChart);
-    </script>
+        const svgBlob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(svgBlob);
+        const img = new Image();
+        img.onload = function () {
+            const canvas = document.createElement('canvas');
+            canvas.width = w * scale;
+            canvas.height = h * scale;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.scale(scale, scale);
+            ctx.drawImage(img, 0, 0, w, h);
+            URL.revokeObjectURL(url);
+            canvas.toBlob(function (blob) {
+                const link = document.createElement('a');
+                link.download = 'survey-chart.png';
+                link.href = URL.createObjectURL(blob);
+                link.click();
+            });
+        };
+        img.src = url;
+    }
+
+    document.getElementById('add-response').addEventListener('click', addResponseField);
+    document.getElementById('generate').addEventListener('click', generateChart);
+    document.getElementById('export-btn').addEventListener('click', exportChartAsPNG);
+    document.getElementById('custom-colors-toggle').addEventListener('change', toggleCustomColors);
+    document.getElementById('responses-container').addEventListener('click', handleTableClick);
+    updateRemoveButtons();
+</script>
 </body>
 </html>
