@@ -167,7 +167,7 @@
     #results { display: none; }
     .results-meta {
         display: flex;
-        justify-content: space-between;
+        justify-content: flex-end;
         align-items: flex-start;
         gap: 16px;
         margin-bottom: 16px;
@@ -190,8 +190,8 @@
         width: 36px;
         height: 36px;
     }
-    #sample-size { color: #666; font-size: 14px; }
-    #plot { width: 100%; margin-bottom: 28px; }
+    #sample-size { color: #666; font-size: 14px; margin-bottom: 20px; }
+    #plot { width: 100%; margin-bottom: 12px; }
     #plot svg { display: block; }
 
     #results-table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -205,11 +205,42 @@
     }
     #results-table td { padding: 10px 12px; border-bottom: 1px solid #eceef1; }
     #results-table tr:hover td { background: #fafbfc; }
+    #results-table .bounds-col { display: none; }
+    #results-table.show-bounds .bounds-col { display: table-cell; }
 
     .grid line { stroke: #eee; }
     .grid .domain { display: none; }
     .axis .domain, .axis line { stroke: #ccc; }
     .axis text { fill: #666; font-size: 12px; }
+
+    .advanced-section { margin-bottom: 8px; }
+    .advanced-toggle {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        width: 100%;
+        text-align: left;
+        background: none;
+        border: none;
+        padding: 8px 0;
+        font-size: 13px;
+        font-weight: 600;
+        color: #555;
+        cursor: pointer;
+    }
+    .advanced-toggle .chevron {
+        display: inline-block;
+        font-size: 10px;
+        transition: transform .15s ease;
+    }
+    .advanced-toggle[aria-expanded="true"] .chevron {
+        transform: rotate(90deg);
+    }
+    .advanced-content {
+        margin-top: 8px;
+        padding-top: 4px;
+    }
+    .advanced-content[hidden] { display: none; }
 </style>
 </head>
 <body>
@@ -230,20 +261,9 @@
             </select>
         </div>
 
-        <div class="field-row">
-            <div class="field">
-                <label>Total number of respondents (N)</label>
-                <input type="number" id="totalN" placeholder="e.g., 200" min="1">
-            </div>
-            <div class="field">
-                <label>Confidence Level</label>
-                <select id="confidence">
-                    <option value="90">90%</option>
-                    <option value="95" selected>95%</option>
-                    <option value="99">99%</option>
-                    <option value="none">None (no error bars)</option>
-                </select>
-            </div>
+        <div class="field">
+            <label>Total number of respondents (N)</label>
+            <input type="number" id="totalN" placeholder="e.g., 200" min="1">
         </div>
 
         <div class="field">
@@ -287,11 +307,27 @@
                 <label>Color Theme</label>
                 <select id="theme">
                     <option value="classic" selected>Classic Blue</option>
-                    <option value="categorical">Categorical (multi-color)</option>
+                    <option value="categorical">Multi-color</option>
                     <option value="monochrome">Monochrome Blue</option>
                     <option value="pastel">Pastel</option>
                 </select>
             </div>
+        </div>
+
+        <div class="field">
+            <label>Font</label>
+            <select id="font-select">
+                <option value="system" selected>System Default</option>
+                <option value="arial">Arial / Helvetica</option>
+                <option value="times">Times New Roman</option>
+                <option value="georgia">Georgia</option>
+                <option value="calibri">Calibri</option>
+                <option value="verdana">Verdana</option>
+                <option value="trebuchet">Trebuchet MS</option>
+                <option value="garamond">Garamond</option>
+                <option value="custom">Custom font name&hellip;</option>
+            </select>
+            <input type="text" id="custom-font-input" placeholder="e.g., Proxima Nova" style="display:none; margin-top:8px;">
         </div>
 
         <div class="checkbox-field">
@@ -309,6 +345,32 @@
             <label for="show-counts-toggle">Show respondent count (#) under bars</label>
         </div>
 
+        <div class="checkbox-field">
+            <input type="checkbox" id="diagonal-labels-toggle">
+            <label for="diagonal-labels-toggle">Diagonal X axis labels</label>
+        </div>
+
+        <div class="advanced-section">
+            <button type="button" class="advanced-toggle" id="advanced-toggle" aria-expanded="false">
+                <span class="chevron">&#9656;</span> Advanced Options
+            </button>
+            <div class="advanced-content" id="advanced-content" hidden>
+                <div class="field">
+                    <label>Confidence Level</label>
+                    <select id="confidence">
+                        <option value="99">99%</option>
+                        <option value="95" selected>95%</option>
+                        <option value="90">90%</option>
+                        <option value="none">None (no error bars)</option>
+                    </select>
+                </div>
+                <div class="checkbox-field">
+                    <input type="checkbox" id="show-bounds-toggle">
+                    <label for="show-bounds-toggle">Show lower and upper bounds</label>
+                </div>
+            </div>
+        </div>
+
         <button id="generate" class="btn-primary" type="button">Generate Chart</button>
     </div>
 
@@ -319,7 +381,6 @@
 
         <div id="results" class="card">
             <div class="results-meta">
-                <div id="sample-size"></div>
                 <div class="export-controls">
                     <select id="export-bg">
                         <option value="transparent" selected>Transparent</option>
@@ -332,6 +393,7 @@
             </div>
             <h2 id="question-title" class="graph-title"></h2>
             <div id="plot"></div>
+            <div id="sample-size"></div>
             <h3>Detailed Results</h3>
             <table id="results-table">
                 <thead>
@@ -340,8 +402,8 @@
                         <th>Count</th>
                         <th>Percentage</th>
                         <th>Margin of Error</th>
-                        <th>Lower Bound</th>
-                        <th>Upper Bound</th>
+                        <th class="bounds-col">Lower Bound</th>
+                        <th class="bounds-col">Upper Bound</th>
                     </tr>
                 </thead>
                 <tbody id="table-body"></tbody>
@@ -360,6 +422,71 @@
         monochrome: ['#0d3b66', '#1d5c99', '#2e7cc2', '#5b9bd5', '#8fbde0', '#c3dcee'],
         pastel: ['#fbb4ae', '#b3cde3', '#ccebc5', '#decbe4', '#fed9a6', '#ffffcc', '#e5d8bd', '#fddaec']
     };
+
+    const FONT_STACKS = {
+        system: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        arial: 'Arial, Helvetica, sans-serif',
+        times: '"Times New Roman", Times, serif',
+        georgia: 'Georgia, serif',
+        calibri: 'Calibri, "Segoe UI", sans-serif',
+        verdana: 'Verdana, sans-serif',
+        trebuchet: '"Trebuchet MS", sans-serif',
+        garamond: 'Garamond, "EB Garamond", serif'
+    };
+
+    function getFontStack() {
+        const val = document.getElementById('font-select').value;
+        if (val === 'custom') {
+            const custom = document.getElementById('custom-font-input').value.trim();
+            return custom ? `"${custom}", ${FONT_STACKS.system}` : FONT_STACKS.system;
+        }
+        return FONT_STACKS[val] || FONT_STACKS.system;
+    }
+
+    function toggleCustomFont() {
+        const isCustom = document.getElementById('font-select').value === 'custom';
+        document.getElementById('custom-font-input').style.display = isCustom ? 'block' : 'none';
+    }
+
+    function toggleAdvanced() {
+        const btn = document.getElementById('advanced-toggle');
+        const content = document.getElementById('advanced-content');
+        const expanded = btn.getAttribute('aria-expanded') === 'true';
+        btn.setAttribute('aria-expanded', String(!expanded));
+        if (expanded) {
+            content.setAttribute('hidden', '');
+        } else {
+            content.removeAttribute('hidden');
+        }
+    }
+
+    function toggleShowBounds() {
+        const checked = document.getElementById('show-bounds-toggle').checked;
+        document.getElementById('results-table').classList.toggle('show-bounds', checked);
+    }
+
+    // Shrinks a selection of axis <text> elements uniformly so the widest
+    // label fits within the available band width. Falls back gracefully in
+    // environments without getBBox support (e.g. some headless renderers).
+    function fitAxisLabelsToWidth(selection, bandwidth) {
+        const maxSize = 12, minSize = 8, padding = 8;
+        selection.style('font-size', maxSize + 'px');
+        let smallestRatio = 1;
+        selection.each(function () {
+            try {
+                const bbox = this.getBBox();
+                const available = bandwidth - padding;
+                if (bbox.width > 0 && available > 0) {
+                    const ratio = available / bbox.width;
+                    if (ratio < smallestRatio) smallestRatio = ratio;
+                }
+            } catch (e) {
+                // getBBox unsupported; keep default size
+            }
+        });
+        const finalSize = Math.max(minSize, Math.min(maxSize, maxSize * smallestRatio));
+        selection.style('font-size', finalSize + 'px');
+    }
 
     function getThemeColor(theme, index, n) {
         const palette = themes[theme] || themes.classic;
@@ -430,14 +557,15 @@
         const showGrid = chartOptions && chartOptions.showGrid;
         const hideErrorBars = chartOptions && chartOptions.hideErrorBars;
         const showCounts = chartOptions && chartOptions.showCounts;
+        const diagonalLabels = chartOptions && chartOptions.diagonalLabels;
+        const fontFamily = (chartOptions && chartOptions.fontFamily) || FONT_STACKS.system;
         const container = d3.select('#plot');
         container.selectAll('*').remove();
         const containerWidth = container.node().clientWidth || 800;
         const n = data.length;
-        const fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
 
         if (orientation === 'vertical') {
-            const margin = { top: 30, right: 30, bottom: 110, left: 60 };
+            const margin = { top: 30, right: 30, bottom: diagonalLabels ? 110 : 60, left: 60 };
             const width = containerWidth;
             const height = 520;
             const innerWidth = width - margin.left - margin.right;
@@ -526,11 +654,16 @@
                 .attr('class', 'axis')
                 .attr('transform', `translate(0,${innerHeight})`)
                 .call(d3.axisBottom(x));
-            xAxis.selectAll('text')
-                .attr('transform', 'rotate(-35)')
-                .style('text-anchor', 'end')
-                .attr('dx', '-0.5em')
-                .attr('dy', '0.15em');
+
+            if (diagonalLabels) {
+                xAxis.selectAll('text')
+                    .attr('transform', 'rotate(-35)')
+                    .style('text-anchor', 'end')
+                    .attr('dx', '-0.5em')
+                    .attr('dy', '0.15em');
+            } else {
+                fitAxisLabelsToWidth(xAxis.selectAll('text'), x.bandwidth());
+            }
 
             g.append('g')
                 .attr('class', 'axis')
@@ -642,7 +775,9 @@
         const useCustomColors = document.getElementById('custom-colors-toggle').checked;
         const showGrid = document.getElementById('show-gridlines-toggle').checked;
         const showCounts = document.getElementById('show-counts-toggle').checked;
+        const diagonalLabels = document.getElementById('diagonal-labels-toggle').checked;
         const questionType = document.getElementById('question-type').value;
+        const fontFamily = getFontStack();
 
         const rows = document.querySelectorAll('.response-row');
         const responses = [];
@@ -672,7 +807,7 @@
             };
         });
 
-        renderChart(data, orientation, { showGrid, hideErrorBars, showCounts });
+        renderChart(data, orientation, { showGrid, hideErrorBars, showCounts, diagonalLabels, fontFamily });
 
         const tableBody = document.getElementById('table-body');
         tableBody.innerHTML = '';
@@ -691,6 +826,7 @@
             tableBody.appendChild(row);
         });
 
+        document.getElementById('results').style.fontFamily = fontFamily;
         document.getElementById('question-title').textContent = question;
         document.getElementById('sample-size').textContent = questionType === 'multi'
             ? `Total respondents: ${totalN} (check all that apply — percentages may not sum to 100%)`
@@ -756,6 +892,9 @@
     document.getElementById('custom-colors-toggle').addEventListener('change', toggleCustomColors);
     document.getElementById('responses-container').addEventListener('click', handleTableClick);
     document.getElementById('export-bg').addEventListener('change', toggleExportBgColor);
+    document.getElementById('font-select').addEventListener('change', toggleCustomFont);
+    document.getElementById('advanced-toggle').addEventListener('click', toggleAdvanced);
+    document.getElementById('show-bounds-toggle').addEventListener('change', toggleShowBounds);
     updateRemoveButtons();
 </script>
 </body>
