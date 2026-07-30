@@ -5,6 +5,160 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Survey Sample Size Calculator</title>
     <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f7f8fa;
+            color: #1a1a1a;
+            margin: 0;
+            padding: 40px 20px;
+        }
+        .app {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 32px;
+            border: 1px solid #eceef1;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        }
+        h1 {
+            font-size: 20px;
+            font-weight: 600;
+            margin: 0 0 24px;
+        }
+        h2 {
+            font-size: 15px;
+            font-weight: 600;
+            color: #444;
+            margin: 0 0 12px;
+        }
+        h3 {
+            font-size: 15px;
+            font-weight: 600;
+            margin: 0 0 4px;
+        }
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 6px;
+        }
+        .field { margin-bottom: 20px; }
+
+        input[type="text"], input[type="number"], select {
+            padding: 10px 12px;
+            border: 1px solid #d8dbe0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            color: #1a1a1a;
+            background: #fff;
+            transition: border-color .15s, box-shadow .15s;
+        }
+        input[type="text"]:focus, input[type="number"]:focus, select:focus {
+            outline: none;
+            border-color: #4a90e2;
+            box-shadow: 0 0 0 3px rgba(74,144,226,0.15);
+        }
+
+        .btn-secondary {
+            background: #f1f3f5;
+            color: #333;
+            border: 1px solid #d8dbe0;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-secondary:hover { background: #e6e8eb; }
+
+        .btn-remove {
+            background: none;
+            border: none;
+            color: #b3454a;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 6px 10px;
+            border-radius: 6px;
+        }
+        .btn-remove:hover { background: #fbeaea; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        th {
+            text-align: left;
+            padding: 10px 12px;
+            background: #f7f8fa;
+            font-weight: 600;
+            color: #555;
+            border-bottom: 2px solid #eceef1;
+        }
+        td { padding: 12px; border-bottom: 1px solid #eceef1; vertical-align: middle; }
+        tr:hover td { background: #fafbfc; }
+        .empty-row td { color: #9aa0a8; text-align: center; padding: 24px 12px; }
+
+        .params-cell { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; font-size: 13px; color: #555; }
+        .params-cell input[type="number"] { width: 80px; }
+        .params-sep { color: #c7cbd1; }
+
+        .sample-size-summary {
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid #eceef1;
+        }
+        .sample-size-summary .headline {
+            font-size: 15px;
+            font-weight: 600;
+            margin: 0 0 4px;
+        }
+        .sample-size-summary .headline .value {
+            color: #4a90e2;
+        }
+        .sample-size-summary .subline {
+            font-size: 13px;
+            color: #8a8f98;
+            margin: 0;
+        }
+
+        .advanced-section { margin-top: 16px; }
+        .advanced-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            width: 100%;
+            text-align: left;
+            background: none;
+            border: none;
+            padding: 8px 0;
+            font-size: 13px;
+            font-weight: 600;
+            color: #555;
+            cursor: pointer;
+        }
+        .advanced-toggle .chevron {
+            display: inline-block;
+            font-size: 10px;
+            transition: transform .15s ease;
+        }
+        .advanced-toggle[aria-expanded="true"] .chevron {
+            transform: rotate(90deg);
+        }
+        .advanced-content {
+            margin-top: 8px;
+            padding-top: 4px;
+            max-width: 360px;
+        }
+        .advanced-content[hidden] { display: none; }
+
         .tip {
             position: relative;
             display: inline-block;
@@ -16,7 +170,7 @@
             width: 15px;
             height: 15px;
             border-radius: 50%;
-            background: #888;
+            background: #b7bcc4;
             color: white;
             font-size: 10px;
             font-weight: bold;
@@ -32,14 +186,14 @@
             background: #222;
             color: #fff;
             padding: 8px 12px;
-            border-radius: 5px;
+            border-radius: 8px;
             font-size: 13px;
             line-height: 1.5;
             z-index: 1000;
             width: 280px;
             left: 22px;
             top: -6px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         }
         .tip:hover .tip-text {
             display: block;
@@ -47,49 +201,62 @@
     </style>
 </head>
 <body>
-    <h1>Survey Sample Size Calculator</h1>
+<div class="app">
+    <div class="card">
+        <h1>Survey Sample Size Calculator</h1>
 
-    <div>
-        <label>Level of Evidence Needed:
-            <span class="tip">
-                <span class="tip-btn">?</span>
-                <span class="tip-text">How confident do you need to be in your results?<br><br>Use <strong>Decision-making</strong> for most surveys. Choose <strong>Scrappy exploration</strong> when in early discovery and some noise is acceptable. Reserve <strong>Gold standard</strong> for high-stakes decisions where being wrong has real consequences.</span>
-            </span>
-        </label>
-        <select id="evidenceLevel" onchange="recalculateAllQuestions()">
-            <option value="0.05">Decision-making (1 in 20 chance of error)</option>
-            <option value="0.10">Scrappy exploration (1 in 10 chance of error)</option>
-            <option value="0.01">Gold standard (1 in 100 chance of error)</option>
-        </select>
-    </div>
+        <div>
+            <h2>Your Survey Questions</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Question</th>
+                        <th>Type
+                            <span class="tip">
+                                <span class="tip-btn">?</span>
+                                <span class="tip-text"><strong>Yes/No:</strong> Two options (yes/no, true/false).<br><strong>Check All:</strong> Checkboxes where participants pick multiple — each treated independently.<br><strong>Multiple Choice:</strong> Pick one from 3+ options.<br><strong>Likert / Rating Scale:</strong> Ordered scale with equal steps (e.g. 1–5 agreement).<br><strong>Numeric:</strong> A number entered as free text (e.g. age, price).</span>
+                            </span>
+                        </th>
+                        <th>Parameters</th>
+                        <th>Sample Size</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="questionsTableBody">
+                </tbody>
+            </table>
+            <div class="field" style="margin-top: 16px; margin-bottom: 0;">
+                <button class="btn-secondary" type="button" onclick="addQuestion()">+ Add Question</button>
+            </div>
+        </div>
 
-    <div>
-        <h2>Your Survey Questions</h2>
-        <button onclick="addQuestion()">Add Question</button>
-        <table border="1" cellpadding="10">
-            <thead>
-                <tr>
-                    <th>Question</th>
-                    <th>Type
-                        <span class="tip">
-                            <span class="tip-btn">?</span>
-                            <span class="tip-text"><strong>Yes/No:</strong> Two options (yes/no, true/false).<br><strong>Check All:</strong> Checkboxes where participants pick multiple — each treated independently.<br><strong>Multiple Choice:</strong> Pick one from 3+ options.<br><strong>Likert / Rating Scale:</strong> Ordered scale with equal steps (e.g. 1–5 agreement).<br><strong>Numeric:</strong> A number entered as free text (e.g. age, price).</span>
-                        </span>
-                    </th>
-                    <th>Parameters</th>
-                    <th>Sample Size</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody id="questionsTableBody">
-            </tbody>
-        </table>
-    </div>
+        <div class="sample-size-summary">
+            <p class="headline">Sample Size Needed for Your Survey: <span class="value" id="maxSampleSize">0</span></p>
+            <p class="subline">Total Questions: <span id="totalQuestions">0</span></p>
 
-    <div>
-        <h3>Sample Size Needed for Your Survey: <span id="maxSampleSize">0</span></h3>
-        <p>Total Questions: <span id="totalQuestions">0</span></p>
+            <div class="advanced-section">
+                <button type="button" class="advanced-toggle" id="advanced-toggle" aria-expanded="false">
+                    <span class="chevron">&#9656;</span> Advanced Options
+                </button>
+                <div class="advanced-content" id="advanced-content" hidden>
+                    <div class="field" style="margin-bottom: 0;">
+                        <label>Confidence Level
+                            <span class="tip">
+                                <span class="tip-btn">?</span>
+                                <span class="tip-text">How confident you need to be in your results. Higher confidence requires a larger sample.<br><br>Use <strong>95%</strong> for most surveys. Choose <strong>90%</strong> for early, scrappy exploration where some noise is acceptable. Reserve <strong>99%</strong> for high-stakes decisions where being wrong has real consequences.</span>
+                            </span>
+                        </label>
+                        <select id="confidence" onchange="recalculateAllQuestions()">
+                            <option value="99">99%</option>
+                            <option value="95" selected>95%</option>
+                            <option value="90">90%</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
+</div>
 
     <script>
     let questionCounter = 0;
@@ -102,10 +269,22 @@
     const RANGE_TIP = `<span class="tip"><span class="tip-btn">?</span><span class="tip-text">The low and high values covering ~95% of expected responses (e.g. ages 22–65 for working adults). When unsure, err wider — a broader range increases sample size but avoids underestimating variance.</span></span>`;
 
     function getZScore() {
-        const alpha = parseFloat(document.getElementById('evidenceLevel').value);
-        if (alpha === 0.01) return 2.576;
-        if (alpha === 0.10) return 1.645;
+        const confidence = parseInt(document.getElementById('confidence').value);
+        if (confidence === 99) return 2.576;
+        if (confidence === 90) return 1.645;
         return 1.96;
+    }
+
+    function toggleAdvanced() {
+        const btn = document.getElementById('advanced-toggle');
+        const content = document.getElementById('advanced-content');
+        const expanded = btn.getAttribute('aria-expanded') === 'true';
+        btn.setAttribute('aria-expanded', String(!expanded));
+        if (expanded) {
+            content.setAttribute('hidden', '');
+        } else {
+            content.removeAttribute('hidden');
+        }
     }
 
     function addQuestion() {
@@ -205,7 +384,7 @@
         tbody.innerHTML = '';
 
         if (questions.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5">No questions yet. Click "Add Question" to get started.</td></tr>';
+            tbody.innerHTML = '<tr class="empty-row"><td colspan="5">No questions yet. Click &ldquo;Add Question&rdquo; to get started.</td></tr>';
             return;
         }
 
@@ -221,31 +400,31 @@
         let paramsHtml = '';
         if (question.type === 'binary' || question.type === 'checkall') {
             paramsHtml = `
-                Desired MOE ${MOE_TIP}: <input type="number" value="${question.params.moe}" min="0.1" step="0.1"
-                    onchange="updateQuestion(${question.id}, 'moe', this.value)"> %
+                <div class="params-cell">Desired MOE ${MOE_TIP}: <input type="number" value="${question.params.moe}" min="0.1" step="0.1"
+                    onchange="updateQuestion(${question.id}, 'moe', this.value)"> %</div>
             `;
         } else if (question.type === 'multiple') {
             paramsHtml = `
-                Desired MOE ${MOE_TIP}: <input type="number" value="${question.params.moe}" min="0.1" step="0.1"
-                    onchange="updateQuestion(${question.id}, 'moe', this.value)"> % |
+                <div class="params-cell">Desired MOE ${MOE_TIP}: <input type="number" value="${question.params.moe}" min="0.1" step="0.1"
+                    onchange="updateQuestion(${question.id}, 'moe', this.value)"> % <span class="params-sep">|</span>
                 Options: <input type="number" value="${question.params.options}" min="2" step="1"
-                    onchange="updateQuestion(${question.id}, 'options', this.value)">
+                    onchange="updateQuestion(${question.id}, 'options', this.value)"></div>
             `;
         } else if (question.type === 'likert') {
             paramsHtml = `
-                Desired MOE ${MOE_TIP}: <input type="number" value="${question.params.moe}" min="0.01" step="0.01"
-                    onchange="updateQuestion(${question.id}, 'moe', this.value)"> pts |
+                <div class="params-cell">Desired MOE ${MOE_TIP}: <input type="number" value="${question.params.moe}" min="0.01" step="0.01"
+                    onchange="updateQuestion(${question.id}, 'moe', this.value)"> pts <span class="params-sep">|</span>
                 Scale Points ${POINTS_TIP}: <input type="number" value="${question.params.points}" min="2" step="1"
-                    onchange="updateQuestion(${question.id}, 'points', this.value)">
+                    onchange="updateQuestion(${question.id}, 'points', this.value)"></div>
             `;
         } else if (question.type === 'numeric') {
             paramsHtml = `
-                Desired MOE ${MOE_TIP}: <input type="number" value="${question.params.moe}" min="0.01" step="0.1"
-                    onchange="updateQuestion(${question.id}, 'moe', this.value)"> |
+                <div class="params-cell">Desired MOE ${MOE_TIP}: <input type="number" value="${question.params.moe}" min="0.01" step="0.1"
+                    onchange="updateQuestion(${question.id}, 'moe', this.value)"> <span class="params-sep">|</span>
                 Expected Range ${RANGE_TIP}: <input type="number" value="${question.params.lower}" step="1"
-                    onchange="updateQuestion(${question.id}, 'lower', this.value)"> –
+                    onchange="updateQuestion(${question.id}, 'lower', this.value)"> &ndash;
                 <input type="number" value="${question.params.upper}" step="1"
-                    onchange="updateQuestion(${question.id}, 'upper', this.value)">
+                    onchange="updateQuestion(${question.id}, 'upper', this.value)"></div>
             `;
         }
 
@@ -267,7 +446,7 @@
                 <td>${paramsHtml}</td>
                 <td>${question.sampleSize}</td>
                 <td>
-                    <button onclick="removeQuestion(${question.id})">Remove</button>
+                    <button class="btn-remove" onclick="removeQuestion(${question.id})">Remove</button>
                 </td>
             </tr>
         `;
@@ -290,6 +469,8 @@
         renderQuestions();
         updateMaxSampleSize();
     }
+
+    document.getElementById('advanced-toggle').addEventListener('click', toggleAdvanced);
 
     window.addEventListener('DOMContentLoaded', function() {
         renderQuestions();

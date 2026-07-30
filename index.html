@@ -1,13 +1,72 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <title>UXR tools</title>
-  </head>
-  <body>
-    <h1>Links</h1>
-    <p>
-      <a href="sample-size-calc.html">Sample size calculator</a>
-      <a href="confidence-interval-grapher.html">Confidence interval grapher</a>
-    </p>
-  </body>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UXR Tools</title>
+<style>
+    * { box-sizing: border-box; }
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: #f7f8fa;
+        color: #1a1a1a;
+        margin: 0;
+        padding: 40px 20px;
+    }
+    .app {
+        max-width: 560px;
+        margin: 0 auto;
+    }
+    .card {
+        background: #fff;
+        border-radius: 12px;
+        padding: 32px;
+        border: 1px solid #eceef1;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    h1 {
+        font-size: 20px;
+        font-weight: 600;
+        margin: 0 0 8px;
+    }
+    .subtitle {
+        font-size: 14px;
+        color: #8a8f98;
+        margin: 0 0 24px;
+    }
+    .tool-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    .tool-link {
+        display: block;
+        padding: 14px 16px;
+        border: 1px solid #d8dbe0;
+        border-radius: 8px;
+        color: #1a1a1a;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 600;
+        transition: border-color .15s, box-shadow .15s, background .15s;
+    }
+    .tool-link:hover {
+        border-color: #4a90e2;
+        box-shadow: 0 0 0 3px rgba(74,144,226,0.15);
+        background: #fafbfc;
+    }
+</style>
+</head>
+<body>
+<div class="app">
+    <div class="card">
+        <h1>UXR Tools</h1>
+        <p class="subtitle">Small utilities for survey analysis and reporting.</p>
+        <div class="tool-list">
+            <a class="tool-link" href="sample-size-calc.html">Sample size calculator</a>
+            <a class="tool-link" href="confidence-interval-grapher.html">Confidence interval grapher</a>
+        </div>
+    </div>
+</div>
+</body>
 </html>
