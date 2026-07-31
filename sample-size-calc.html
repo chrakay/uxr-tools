@@ -82,9 +82,9 @@
             border: none;
             color: #b3454a;
             cursor: pointer;
-            font-size: 13px;
-            font-weight: 600;
-            padding: 6px 10px;
+            font-size: 18px;
+            line-height: 1;
+            padding: 4px 8px;
             border-radius: 6px;
         }
         .btn-remove:hover { background: #fbeaea; }
@@ -106,7 +106,8 @@
         tr:hover td { background: #fafbfc; }
         .empty-row td { color: #9aa0a8; text-align: center; padding: 24px 12px; }
 
-        .params-cell { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; font-size: 13px; color: #555; }
+        .params-cell { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #555; }
+        .params-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
         .params-cell input[type="number"] { width: 80px; }
         .params-sep { color: #c7cbd1; }
 
@@ -232,7 +233,6 @@
 
         <div class="sample-size-summary">
             <p class="headline">Sample Size Needed for Your Survey: <span class="value" id="maxSampleSize">0</span></p>
-            <p class="subline">Total Questions: <span id="totalQuestions">0</span></p>
 
             <div class="advanced-section">
                 <button type="button" class="advanced-toggle" id="advanced-toggle" aria-expanded="false">
@@ -262,7 +262,23 @@
     let questionCounter = 0;
     let questions = [];
 
-    const MOE_TIP = `<span class="tip"><span class="tip-btn">?</span><span class="tip-text">How precise the result needs to be. At ±5% MOE, if 60% say yes, the true answer falls between 55–65%. Smaller values = larger sample needed.<br><br>Units: percentage points for Yes/No, Check All, and Multiple Choice; scale points for Likert; your question's units for Numeric.</span></span>`;
+    const MOE_EXAMPLES = {
+        binary: 'At ±5% margin of error, if 60% say yes, the true answer falls between 55–65%.',
+        checkall: 'At ±5% margin of error, if 60% select an option, the true answer falls between 55–65%.',
+        multiple: 'At ±5% margin of error, if 30% choose an option, the true answer falls between 25–35%.',
+        likert: 'At ±0.3 pts margin of error, if the average rating is 4.2, the true answer falls between 3.9–4.5.',
+        numeric: 'At ±5 margin of error, if the average is 50, the true answer falls between 45–55 (in your question\'s units).'
+    };
+
+    function getMoeTip(type) {
+        const example = MOE_EXAMPLES[type] || MOE_EXAMPLES.binary;
+        const units = type === 'likert'
+            ? 'Units: scale points.'
+            : type === 'numeric'
+                ? "Units: your question's units."
+                : 'Units: percentage points.';
+        return `<span class="tip"><span class="tip-btn">?</span><span class="tip-text">Margin of error: how precise the result needs to be. Smaller values require a larger sample.<br><br>${example}<br><br>${units}</span></span>`;
+    }
 
     const POINTS_TIP = `<span class="tip"><span class="tip-btn">?</span><span class="tip-text">Number of options on your scale. A 5-point agreement scale = 5.</span></span>`;
 
@@ -398,33 +414,42 @@
         let existingRow = document.getElementById(`question-row-${question.id}`);
 
         let paramsHtml = '';
+        const moeTip = getMoeTip(question.type);
         if (question.type === 'binary' || question.type === 'checkall') {
             paramsHtml = `
-                <div class="params-cell">Desired MOE ${MOE_TIP}: <input type="number" value="${question.params.moe}" min="0.1" step="0.1"
-                    onchange="updateQuestion(${question.id}, 'moe', this.value)"> %</div>
+                <div class="params-cell">
+                    <div class="params-row">Desired MOE ${moeTip}: <input type="number" value="${question.params.moe}" min="0.1" step="0.1"
+                        onchange="updateQuestion(${question.id}, 'moe', this.value)"> %</div>
+                </div>
             `;
         } else if (question.type === 'multiple') {
             paramsHtml = `
-                <div class="params-cell">Desired MOE ${MOE_TIP}: <input type="number" value="${question.params.moe}" min="0.1" step="0.1"
-                    onchange="updateQuestion(${question.id}, 'moe', this.value)"> % <span class="params-sep">|</span>
-                Options: <input type="number" value="${question.params.options}" min="2" step="1"
-                    onchange="updateQuestion(${question.id}, 'options', this.value)"></div>
+                <div class="params-cell">
+                    <div class="params-row">Desired MOE ${moeTip}: <input type="number" value="${question.params.moe}" min="0.1" step="0.1"
+                        onchange="updateQuestion(${question.id}, 'moe', this.value)"> %</div>
+                    <div class="params-row">Options: <input type="number" value="${question.params.options}" min="2" step="1"
+                        onchange="updateQuestion(${question.id}, 'options', this.value)"></div>
+                </div>
             `;
         } else if (question.type === 'likert') {
             paramsHtml = `
-                <div class="params-cell">Desired MOE ${MOE_TIP}: <input type="number" value="${question.params.moe}" min="0.01" step="0.01"
-                    onchange="updateQuestion(${question.id}, 'moe', this.value)"> pts <span class="params-sep">|</span>
-                Scale Points ${POINTS_TIP}: <input type="number" value="${question.params.points}" min="2" step="1"
-                    onchange="updateQuestion(${question.id}, 'points', this.value)"></div>
+                <div class="params-cell">
+                    <div class="params-row">Desired MOE ${moeTip}: <input type="number" value="${question.params.moe}" min="0.01" step="0.01"
+                        onchange="updateQuestion(${question.id}, 'moe', this.value)"> pts</div>
+                    <div class="params-row">Scale Points ${POINTS_TIP}: <input type="number" value="${question.params.points}" min="2" step="1"
+                        onchange="updateQuestion(${question.id}, 'points', this.value)"></div>
+                </div>
             `;
         } else if (question.type === 'numeric') {
             paramsHtml = `
-                <div class="params-cell">Desired MOE ${MOE_TIP}: <input type="number" value="${question.params.moe}" min="0.01" step="0.1"
-                    onchange="updateQuestion(${question.id}, 'moe', this.value)"> <span class="params-sep">|</span>
-                Expected Range ${RANGE_TIP}: <input type="number" value="${question.params.lower}" step="1"
-                    onchange="updateQuestion(${question.id}, 'lower', this.value)"> &ndash;
-                <input type="number" value="${question.params.upper}" step="1"
-                    onchange="updateQuestion(${question.id}, 'upper', this.value)"></div>
+                <div class="params-cell">
+                    <div class="params-row">Desired MOE ${moeTip}: <input type="number" value="${question.params.moe}" min="0.01" step="0.1"
+                        onchange="updateQuestion(${question.id}, 'moe', this.value)"></div>
+                    <div class="params-row">Expected Range ${RANGE_TIP}: <input type="number" value="${question.params.lower}" step="1"
+                        onchange="updateQuestion(${question.id}, 'lower', this.value)"> &ndash;
+                        <input type="number" value="${question.params.upper}" step="1"
+                        onchange="updateQuestion(${question.id}, 'upper', this.value)"></div>
+                </div>
             `;
         }
 
@@ -446,7 +471,7 @@
                 <td>${paramsHtml}</td>
                 <td>${question.sampleSize}</td>
                 <td>
-                    <button class="btn-remove" onclick="removeQuestion(${question.id})">Remove</button>
+                    <button class="btn-remove" title="Remove" onclick="removeQuestion(${question.id})">&times;</button>
                 </td>
             </tr>
         `;
@@ -461,7 +486,6 @@
     function updateMaxSampleSize() {
         const maxSize = questions.length > 0 ? Math.max(...questions.map(q => q.sampleSize)) : 0;
         document.getElementById('maxSampleSize').textContent = maxSize;
-        document.getElementById('totalQuestions').textContent = questions.length;
     }
 
     function recalculateAllQuestions() {
