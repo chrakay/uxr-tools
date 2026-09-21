@@ -820,8 +820,8 @@
                 <td>${d.count}</td>
                 <td>${d.percentage.toFixed(2)}%</td>
                 <td>${hasCI ? '&plusmn;' + marginOfError.toFixed(2) + '%' : '&mdash;'}</td>
-                <td>${hasCI ? d.lower.toFixed(2) + '%' : '&mdash;'}</td>
-                <td>${hasCI ? d.upper.toFixed(2) + '%' : '&mdash;'}</td>
+                <td class="bounds-col">${hasCI ? d.lower.toFixed(2) + '%' : '&mdash;'}</td>
+                <td class="bounds-col">${hasCI ? d.upper.toFixed(2) + '%' : '&mdash;'}</td>
             `;
             tableBody.appendChild(row);
         });
